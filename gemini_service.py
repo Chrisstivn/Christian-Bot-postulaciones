@@ -1,28 +1,9 @@
 """
 gemini_service.py
-Toda la interacción con Gemini, vía **Vertex AI Express Mode**.
-
-Por qué Express Mode y no la API key normal de AI Studio:
-  La API key "normal" de Google AI Studio vive en un proyecto de Google
-  Cloud, y Google exige que cualquier app que sirva a usuarios en la
-  UE/Suiza/UK use "Paid Services" — por eso el free tier daba
-  `limit: 0` sin importar que la key fuera nueva.
-  Vertex AI Express Mode es un producto distinto: da una API key propia,
-  sin necesidad de vincular billing, pensada justo para prototipos como
-  este (90 días de prueba gratis / cuotas propias, no las del free tier
-  de AI Studio).
-
-Cómo obtener la key de Express Mode:
-  1. https://console.cloud.google.com/vertex-ai -> "Vertex AI Express Mode"
-  2. Sigue el flujo de onboarding rápido (no pide tarjeta).
-  3. Copia la API key que te entrega ahí (NO es la misma key de AI Studio).
-
-Instalación:
-  pip install google-genai
-
-Todas las funciones devuelven JSON estricto y se validan con Pydantic. Si
-Gemini se desvía del esquema, esto lanza un error ANTES de tocar Neo4j o
-el docx -> nunca llega data corrupta al resto del pipeline.
+Interacción con Gemini mediante Vertex AI y Application Default Credentials.
+Configura GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION y GEMINI_MODEL.
+El cliente se inicializa al hacer la primera llamada para permitir pruebas
+locales sin credenciales. Nunca se incluyen credenciales en el repositorio.
 """
 
 from dotenv import load_dotenv
@@ -43,8 +24,6 @@ from models import (
 from application_agent.confidence_engine import classify_open_question
 from candidate_bible import CandidateBible
 
-# Vertex AI Express Mode: se autentica con api_key + vertexai=True.
-# OJO: esta key es la de Express Mode, distinta a la de aistudio.google.com.
 MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 VERTEX_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "jobbot-508720")
 VERTEX_LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
@@ -52,15 +31,18 @@ VERTEX_LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
 # Standard Vertex AI using Application Default Credentials (ADC).
 # Do not use the old Express Mode API key here: that key belongs to the
 # billing-disabled Express project and causes 403 BILLING_DISABLED.
-_client = genai.Client(
-    vertexai=True,
-    project=VERTEX_PROJECT,
-    location=VERTEX_LOCATION,
-)
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(vertexai=True, project=VERTEX_PROJECT, location=VERTEX_LOCATION)
+    return _client
 
 
 def _call_gemini_json(system_prompt: str, user_content: str) -> dict:
-    response = _client.models.generate_content(
+    response = _get_client().models.generate_content(
         model=MODEL_NAME,
         contents=user_content,
         config=types.GenerateContentConfig(
@@ -293,23 +275,20 @@ adicional ni markdown:
 
 REGLAS DE NEGOCIO (obligatorias):
 0A. No estas reescribiendo el CV maestro de forma generica. Estas
-   REPOSICIONANDO a la candidata para ESTE rol especifico. Antes de
+   REPOSICIONANDO al candidato para ESTE rol especifico. Antes de
    escribir, identifica el job_title objetivo, responsabilidades,
    requisitos, keywords y el angulo profesional mas creible usando
    CV_MAESTRO, JOB_DESCRIPTION y CANDIDATE_BIBLE_SOURCE_OF_TRUTH si esta
    disponible.
-0B. "nuevo_perfil" debe empezar posicionando a la candidata como el rol
-   objetivo o una variante muy cercana. Evita aperturas genericas como
-   "Marketing professional with experience..." cuando la oferta pide
-   "Growth Marketing Manager", "Performance Marketing Lead", "CRM Manager"
-   u otro posicionamiento especifico.
-0C. "nuevas_tareas" NO deben ser una copia reciclada del CV maestro. Deben
-   combinar experiencia real, keywords importantes del JOB_DESCRIPTION y
-   skills declaradas en CANDIDATE_BIBLE. Puedes reformular experiencia real
-   hacia lifecycle marketing, CRM automation, experimentation, analytics,
-   performance, growth, campaigns o customer journeys SOLO si es coherente
-   con el CV/Bible. Nunca inventes herramientas, empresas, certificaciones,
-   presupuestos, metricas o responsabilidades no soportadas.
+0B. Posiciona al candidato para el rol objetivo únicamente cuando lo respalde
+   CV_MAESTRO. Extrae de ese documento la formación, funciones de proyectos,
+   coordinación, mejora de procesos y experiencia analítica reales.
+0C. Reformula hechos comprobados hacia los requisitos de la oferta. Usa solo
+   herramientas declaradas en CV_MAESTRO. No atribuyas herramientas, campañas,
+   presupuestos, métricas o años de experiencia no documentados.
+   Una herramienta o función mencionada solo en JOB_DESCRIPTION no constituye
+   experiencia del candidato. CV_MAESTRO prevalece ante contradicciones con
+   CANDIDATE_BIBLE o ejemplos previos.
 0. TODO el output ("nuevo_titulo", "nuevo_perfil", "nuevo_cargo_actual",
    "nuevas_tareas") va SIEMPRE en español, sin importar en qué idioma esté
    JOB_DESCRIPTION. Redacta el texto generado en español. Nunca pongas
@@ -322,7 +301,7 @@ REGLAS DE NEGOCIO (obligatorias):
    Debe ocupar EXACTAMENTE DOS líneas en el encabezado del CV. No basta
    con cumplir el número de caracteres: palabras anchas o una última palabra
    corta pueden empujar el título a una tercera línea. Escribe el título con
-   una distribución de palabras que deje "Christian | <título>" en solo
+   una distribución de palabras que deje "Christian Molina | <título>" en solo
    dos líneas visuales.
 
    Longitud obligatoria:
@@ -335,14 +314,8 @@ REGLAS DE NEGOCIO (obligatorias):
 
    Ejemplos:
 
-   Marketing Manager
-   -> Marketing Manager, Digital Growth
-
-   Sales Manager
-   -> Sales Manager, Business Development
-
-   HR Manager
-   -> HR Manager, Talent Acquisition
+   Gestión de proyectos y mejora de procesos
+   -> enfoca la especialización en hechos del CV maestro y requisitos del rol.
 
    Nunca inventes tecnologías, herramientas, certificaciones,
    empresas, idiomas, seniority o responsabilidades que no aparezcan
@@ -355,11 +328,12 @@ REGLAS DE NEGOCIO (obligatorias):
    en "&", "and", "or", una coma o cualquier conector colgante.
 
 2. "nuevo_perfil": un párrafo de EXACTAMENTE 6 líneas (aproximadamente
-   550-650 caracteres en total) que combine la experiencia REAL descrita
+   555-635 caracteres en total) que combine la experiencia REAL descrita
    en CV_MAESTRO con el lenguaje del puesto al que se postula. Tono
    profesional, "corporate", persuasivo. Puede reformular y enfatizar,
    pero NO puede inventar empresas, títulos universitarios, certificaciones
-   o años de experiencia que no existan en CV_MAESTRO.
+   o años de experiencia que no existan en CV_MAESTRO. No asumas continuidad
+   entre fechas ni declares un total de años no documentado.
    OBLIGATORIO: el párrafo debe terminar en una oración COMPLETA que
    cierre con punto. Antes de responder, cuenta las frases y verifica que
    la última esté totalmente terminada -- nunca cortes a mitad de una
@@ -367,13 +341,11 @@ REGLAS DE NEGOCIO (obligatorias):
    largo, ajusta el desarrollo de las ideas (no la puntuación) para caer
    en las ~6 líneas completas.
 3. "nuevo_cargo_actual": el título del ROL MÁS RECIENTE (el primero listado
-   en la sección Experience de CV_MAESTRO), ajustado para que se parezca al
-   job_title de la oferta. Ejemplo: si el rol actual real es
-   "Sr. Marketing Manager" y la oferta es "Senior Digital Marketing
-   Specialist", el nuevo cargo puede ser "Senior Digital Marketing
-   Specialist" o una fusión razonable como "Sr. Digital Marketing Manager".
-   OBLIGATORIO: la parte del cargo ANTES de la coma (sin contar "Stanley
-   Black & Decker", que va después de la coma y no cuenta para este
+   en la sección Experiencia de CV_MAESTRO), ajustado para que se parezca al
+   job_title de la oferta solo en funciones equivalentes comprobadas.
+   Conserva el nivel real documentado en CV_MAESTRO: no lo conviertas
+   en Senior, Lead, Head o Director ni atribuyas un cargo de otra profesión.
+   OBLIGATORIO: la parte del cargo ANTES de la coma (sin contar "la empresa real del CV", que va después de la coma y no cuenta para este
    límite) debe tener MÁXIMO 45 caracteres. Si el job_title de la oferta es
    más largo que eso, acórtalo a una versión razonable que quepa, nunca lo
    copies completo si se pasa del límite.
@@ -387,18 +359,15 @@ REGLAS DE NEGOCIO (obligatorias):
    caracteres, siempre como oración completa.
 
    TODAS las responsabilidades deben escribirse SIEMPRE en tiempo pasado,
-   utilizando verbos naturales y concretos como "Managed", "Led",
-   "Developed", "Designed", "Implemented", "Optimized", "Created",
-   "Executed", "Coordinated", "Analyzed", "Improved", "Delivered",
-   "Built", "Launched" o "Presented".
+   utilizando verbos naturales y concretos como "Gestioné", "Lideré", "Desarrollé", "Implementé", "Coordiné" o "Analicé".
 
-   Nunca utilices presente ("Manage", "Lead", "Develop") ni gerundios
-   ("Managing", "Leading", "Developing").
+   Nunca utilices presente ("Gestiono", "Lidero") ni infinitivos
+   ("Gestionar", "Liderar") o gerundios ("Gestionando", "Liderando").
 
    REGLA DE ESTILO OBLIGATORIA:
    - NO uses estos verbos/palabras en "nuevas_tareas": "orchestrated",
      "engineered", "leveraged", "owned", "translated", "collaborated",
-     "defined" ni "drove". Son expresiones que la candidata pidió evitar.
+     "defined" ni "drove". Son expresiones que el candidato pidió evitar.
      Esta prohibición aplica AUNQUE esas palabras aparezcan en CV_MAESTRO:
      conserva el hecho real pero reformúlalo con lenguaje natural distinto.
    - Cada bullet debe ser una oración gramaticalmente COMPLETA, natural y
@@ -419,8 +388,8 @@ REGLAS DE NEGOCIO (obligatorias):
        inferidas directamente del rol más reciente y de la experiencia
        previa contenida en CV_MAESTRO.
 
-   (b) palabras clave, herramientas y responsabilidades presentes en
-       JOB_DESCRIPTION.
+   (b) palabras clave de JOB_DESCRIPTION compatibles con la experiencia
+       comprobada. Herramientas y responsabilidades solo si el CV las respalda.
 
    Deben sonar como experiencia REAL ya realizada por el candidato,
    nunca como una copia literal de la oferta.
@@ -457,7 +426,7 @@ _BANNED_CV_BULLET_WORDS = (
 )
 
 _DANGLING_BULLET_ENDINGS = {
-    "a", "an", "the", "and", "or", "but", "to", "of", "in", "on", "at",
+    "y", "o", "de", "del", "en", "con", "para", "por", "el", "la", "los", "las", "un", "una", "a", "an", "the", "and", "or", "but", "to", "of", "in", "on", "at",
     "for", "from", "with", "into", "by", "as", "than", "that", "which",
     "while", "through", "across", "within", "including", "using",
 }
@@ -465,7 +434,7 @@ _DANGLING_BULLET_ENDINGS = {
 # Visual layout calibration from the real Word-generated CV.
 # Character counts alone are not enough: 44 wide characters can wrap to
 # three lines while a different 45-character title still fits in two.
-_TITLE_LAYOUT_PREFIX = "Christian | "
+_TITLE_LAYOUT_PREFIX = "Christian Molina | "
 _TITLE_FONT_NAME = "Helvetica-Bold"  # metric-compatible approximation of Arial Bold
 _TITLE_FONT_SIZE_PT = 15.96
 _TITLE_LINE_WIDTH_PT = 278.0
@@ -549,7 +518,7 @@ def _title_style_problems(text: str) -> list[str]:
     title = (text or "").strip()
     problems: list[str] = []
 
-    if re.search(r"(?:&|\band\b|\bor\b|[,;:/])\s*$", title, flags=re.IGNORECASE):
+    if re.search(r"(?:&|\band\b|\bor\b|\by\b|\bo\b|[,;:/])\s*$", title, flags=re.IGNORECASE):
         problems.append("nuevo_titulo termina en un conector o signo colgante")
 
     return problems
@@ -757,8 +726,7 @@ def _expand_short_title(
 Te doy un título profesional para un CV que quedó DEMASIADO CORTO. Tu
 única tarea es ampliarlo a exactamente entre 39 y 45 caracteres,
 agregando una especialización o responsabilidad REAL tomada de
-JOB_DESCRIPTION (ej. "Marketing Manager" -> "Marketing Manager, Digital
-Growth"). Nunca inventes tecnologías, herramientas, certificaciones,
+CV_MAESTRO y JOB_DESCRIPTION (gestión de proyectos y mejora de procesos). Nunca inventes tecnologías, herramientas, certificaciones,
 idiomas o seniority que no aparezcan en JOB_DESCRIPTION.
 
 Todo en español. Nunca coma antes de "y". Nunca uses guion ni raya.
@@ -826,6 +794,7 @@ Devuelve SOLO este JSON, sin texto adicional:
 def _repair_invalid_cv_fields_with_gemini(
     adaptation: "CVAdaptation",
     job_description_text: str,
+    source_context: str = "",
 ) -> "CVAdaptation":
     """Ask Gemini to rewrite only fields that still violate layout/style rules.
 
@@ -858,7 +827,7 @@ def _repair_invalid_cv_fields_with_gemini(
             f'{title_lines} rendered lines. Rewrite it as a COMPLETE '
             'professional title using only wording supported by '
             'JOB_DESCRIPTION. It must be 39-45 characters AND make the full '
-            '"Christian | <title>" header fit in exactly TWO visual '
+            '"Christian Molina | <title>" header fit in exactly TWO visual '
             'lines. If the current title creates 3 lines, prefer a slightly '
             'shorter or better-balanced 39-42 character wording. It must not '
             'end in &, and, or, a comma or another dangling connector.'
@@ -942,7 +911,7 @@ truncate strings mechanically.
 Mandatory style:
 - Spanish only.
 - Natural professional CV language.
-- No comma immediately before "and".
+- No coma justo antes de "y".
 - No hyphen, en dash or em dash in generated prose.
 - Preserve facts already present in the supplied text.
 - Never invent a tool, company, metric, certification or responsibility.
@@ -950,7 +919,7 @@ Mandatory style:
 """
 
     user_content = (
-        "FIELDS TO REPAIR:\n- "
+        source_context + "\n\nFIELDS TO REPAIR:\n- "
         + "\n- ".join(invalid_fields)
         + "\n\n"
         + "\n\n".join(payload_lines)
@@ -989,6 +958,7 @@ Mandatory style:
 def _stable_cv_repair_pass(
     adaptation: "CVAdaptation",
     job_description_text: str,
+    source_context: str = "",
 ) -> "CVAdaptation":
     """Restore the previously working repair strategy.
 
@@ -1008,6 +978,7 @@ def _stable_cv_repair_pass(
     return _repair_invalid_cv_fields_with_gemini(
         adaptation,
         job_description_text,
+        source_context,
     )
 
 
@@ -1033,7 +1004,7 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
     # Normal path: ONE complete Gemini generation.
     raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT, base_content)
     adaptation = CVAdaptation.model_validate(raw)
-    adaptation = _stable_cv_repair_pass(adaptation, job_description_text)
+    adaptation = _stable_cv_repair_pass(adaptation, job_description_text, base_content)
     problems = _validate_adaptation(adaptation)
     if not problems:
         return adaptation
@@ -1049,7 +1020,7 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
     )
     raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT, retry_content)
     adaptation = CVAdaptation.model_validate(raw)
-    adaptation = _stable_cv_repair_pass(adaptation, job_description_text)
+    adaptation = _stable_cv_repair_pass(adaptation, job_description_text, base_content)
     final_problems = _validate_adaptation(adaptation)
 
     if final_problems:
@@ -1127,9 +1098,8 @@ Reglas:
 - Nunca pongas una coma justo antes de "y". Nunca uses guion ni raya
   (ni "-", ni en dash, ni em dash); conecta ideas con una coma o "y".
 - No inventes experiencia que no exista en CV_MAESTRO; si el calce es
-  parcial, redacta de forma honesta pero favorable (ej. "although my
-  direct experience with X is limited, I have worked with equivalent
-  tools such as Y").
+  parcial, redacta de forma honesta pero favorable (ej. "Mi experiencia directa con X es limitada; tengo experiencia
+  con Y").
 - No repitas literalmente el texto de la pregunta dentro de la respuesta.
 """
 
@@ -1262,7 +1232,7 @@ def answer_open_field(cv_maestro_text: str, job_context: str, field_label: str) 
         f"JOB_CONTEXT:\n{job_context}\n\n"
         f"FIELD_LABEL:\n{field_label}"
     )
-    response = _client.models.generate_content(
+    response = _get_client().models.generate_content(
         model=MODEL_NAME,
         contents=user_content,
         config=types.GenerateContentConfig(

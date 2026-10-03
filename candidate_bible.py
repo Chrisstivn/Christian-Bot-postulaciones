@@ -257,5 +257,82 @@ class CandidateBible:
         self.path.write_text(text, encoding="utf-8")
 
 
-def load_candidate_bible(path: str | Path = DEFAULT_BIBLE_PATH) -> CandidateBible:
-    return CandidateBible.load(path)
+def _add_local_cv_facts(bible: CandidateBible, cv_path: Path) -> CandidateBible:
+    """Read candidate facts from the local Word; never write private data to YAML.
+
+    The authoritative CV overrides inherited identity, tools and career facts.
+    Undocumented legal status, availability and preferences remain user-managed.
+    """
+    from docx import Document
+    from cv_date_guard import read_current_role
+    doc = Document(cv_path)
+    paragraphs = doc.paragraphs
+    lines = [p.text.strip() for p in paragraphs if p.text.strip()]
+    text = "\n".join(lines)
+    personal = bible.data.setdefault("personal", {})
+    header = next((line for line in lines if "|" in line), "")
+    if header:
+        name = header.partition("|")[0].strip()
+        personal["full_name"] = name
+        personal["first_name"], _, personal["last_name"] = name.partition(" ")
+    email = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", text)
+    phone = re.search(r"\+\d[\d ()-]{6,}\d", text)
+    linkedin = re.search(r"https?://(?:www\.)?linkedin\.com/[^\s]+", text)
+    if email:
+        personal["email"] = email.group()
+    if phone:
+        personal["phone"] = phone.group().strip()
+        location_line = next((line for line in lines if phone.group() in line), "")
+        location = location_line.partition(phone.group())[0].strip(" |")
+        if location:
+            personal["location"] = location
+    if linkedin:
+        personal["linkedin"] = linkedin.group()
+
+    sections = {}
+    active = ""
+    for paragraph in paragraphs:
+        value = paragraph.text.strip()
+        if not value or set(value) <= {"_"}:
+            continue
+        if paragraph.style.name == "Heading 1":
+            active = value.casefold()
+            sections.setdefault(active, [])
+        elif active:
+            sections[active].append(value)
+
+    role = read_current_role(str(cv_path))
+    professional = bible.data.setdefault("professional", {})
+    professional["current_company"] = role.company
+    professional["current_role_dates"] = role.dates
+    first_role = next((p.text for p in paragraphs if p.style.name == "Heading 2" and "," in p.text), "")
+    professional["current_position"] = first_role.partition(",")[0].strip()
+    professional["experience"] = sections.get("experiencia", [])
+    # Do not feed the template's placeholder zero as a factual career total.
+    professional.pop("years_experience", None)
+    bible.data["education"] = sections.get("estudios", [])
+    bible.data["certifications"] = sections.get("certificados", [])
+    bible.data.setdefault("skills", {})["tools"] = [
+        item.strip() for line in sections.get("habilidades", [])
+        for item in line.split(",") if item.strip()
+    ]
+    languages = {}
+    aliases = {"español": "spanish", "inglés": "english", "portugués": "portuguese"}
+    for line in sections.get("idiomas", []):
+        parts = re.split(r"\s+[–—-]\s+", line, maxsplit=1)
+        if len(parts) == 2:
+            language, level = parts
+            languages[aliases.get(language.casefold(), language.casefold())] = {"level": level.strip()}
+    if languages:
+        bible.data["languages"] = languages
+    return bible
+
+
+def load_candidate_bible(path: str | Path = DEFAULT_BIBLE_PATH,
+                         cv_path: str | Path | None = None) -> CandidateBible:
+    import os
+    bible = CandidateBible.load(path)
+    source = Path(cv_path or os.environ.get("CV_MAESTRO_DOCX", "Christian_CV.docx"))
+    if source.exists():
+        bible = _add_local_cv_facts(bible, source)
+    return bible

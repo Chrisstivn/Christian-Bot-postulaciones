@@ -54,7 +54,6 @@ def initialize_output_excel():
     excel_output.ensure_workbook()
 
 CV_MAESTRO_DOCX = os.environ.get("CV_MAESTRO_DOCX", "Christian_CV.docx")
-CV_MAESTRO_TXT_CACHE = Path("cv_maestro_cache.txt")
 
 REAL_CURRENT_COMPANY = os.environ.get("CV_CURRENT_COMPANY", "")
 REAL_CURRENT_DATES = os.environ.get("CV_CURRENT_DATES", "")
@@ -64,14 +63,11 @@ WORK_DIR.mkdir(exist_ok=True)
 
 
 def _load_cv_maestro_text() -> str:
-    if CV_MAESTRO_TXT_CACHE.exists():
-        return CV_MAESTRO_TXT_CACHE.read_text(encoding="utf-8")
-
+    # Read the authoritative DOCX every time; an old text cache must never
+    # silently feed another candidate's CV to Gemini.
     from docx import Document
     doc = Document(CV_MAESTRO_DOCX)
-    text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    CV_MAESTRO_TXT_CACHE.write_text(text, encoding="utf-8")
-    return text
+    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
 
 def _resolve_job_text(url: str, job_text: str, source: str) -> str:
@@ -123,12 +119,17 @@ def _build_application_pdf_artifacts(payload: ScrapeInput, app_id: str) -> dict:
     cv_maestro_text = _load_cv_maestro_text()
 
     try:
-        candidate_bible = load_candidate_bible()
+        current_role = cv_date_guard.read_current_role(CV_MAESTRO_DOCX)
+        if REAL_CURRENT_COMPANY and REAL_CURRENT_COMPANY != current_role.company:
+            raise ValueError("CV_CURRENT_COMPANY no coincide con el CV maestro")
+        if REAL_CURRENT_DATES and REAL_CURRENT_DATES != current_role.dates:
+            raise ValueError("CV_CURRENT_DATES no coincide con el CV maestro")
+        candidate_bible = load_candidate_bible(cv_path=CV_MAESTRO_DOCX)
         adaptation = gemini_service.adapt_cv(cv_maestro_text, job_text, candidate_bible=candidate_bible)
         gemini_service.verify_cv_adaptation_safety(
             adaptation,
-            REAL_CURRENT_COMPANY,
-            REAL_CURRENT_DATES
+            current_role.company,
+            current_role.dates
         )
     except Exception as e:
         raise HTTPException(422, f"Fallo adaptación CV: {e}")
@@ -139,9 +140,8 @@ def _build_application_pdf_artifacts(payload: ScrapeInput, app_id: str) -> dict:
         str(adapted_docx_path),
         adaptation.model_dump()
     )
-    # Change only the canonical end date in the generated DOCX XML.
-    # No python-docx reopen/save: historical fonts/layout stay exactly as produced.
-    cv_date_guard.enforce_real_current_date(str(adapted_docx_path))
+    # Validate every employment date against the source; never patch dates.
+    cv_date_guard.verify_immutable_dates(CV_MAESTRO_DOCX, str(adapted_docx_path))
     # PDF-only workflow: these fields are not rendered by pdf_generator.
     # Do not spend Gemini calls generating autofill/application answers.
     responses: list[QuestionAnswer] = []
@@ -295,14 +295,14 @@ def _run_autofill_only(payload: AutofillInput) -> dict:
     context = _answer_missing_autofill_context(payload, cv_maestro_text)
     job_context = payload.job_context
     if not job_context:
-        bible_context = load_candidate_bible().to_gemini_context()
+        bible_context = load_candidate_bible(cv_path=CV_MAESTRO_DOCX).to_gemini_context()
         job_context = f"{payload.job_text}\n\n{bible_context}".strip()
 
     expected_salary = payload.expected_salary
     if expected_salary is None:
         try:
             expected_salary = int(
-                load_candidate_bible().get_path(
+                load_candidate_bible(cv_path=CV_MAESTRO_DOCX).get_path(
                     "preferences.minimum_salary_eur",
                     55000,
                 )

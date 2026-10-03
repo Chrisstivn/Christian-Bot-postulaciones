@@ -42,8 +42,9 @@ excluidos de Git; cada clon crea su propio archivo vacío sin publicar resultado
 
 ### Configuración de credenciales
 
-Copia `.env.example` a `.env` y completa tu propia clave
-`VERTEX_EXPRESS_API_KEY` y las credenciales de tus bases de datos.
+Copia `.env.example` a `.env`, configura `GOOGLE_CLOUD_PROJECT` y
+`GOOGLE_CLOUD_LOCATION`, autentica Vertex AI con Application Default Credentials
+y completa las credenciales de tus bases de datos.
 No subas `.env` ni sus copias de respaldo. El ejemplo no contiene claves
 ni contraseñas y usa `SUBMIT_APPLICATIONS=false` mientras se adapta el CV.
 
@@ -61,44 +62,53 @@ No hay filtro salarial activo. Para añadirlo en Chile hay que definir CLP,
 período mensual/anual y qué hacer si no se publica sueldo. Los helpers en EUR
 heredados no intervienen en la búsqueda.
 
-## Archivos para adaptar el CV y candidato
+## CV de Christian y adaptación con Gemini
 
-La copia todavía contiene el CV y datos de Christian. Antes de postular como
-Christian hay que revisar:
+Guarda localmente el Word actualizado como `Christian_CV.docx` en la raíz del
+proyecto, o configura su ruta con `CV_MAESTRO_DOCX`. El Word y los PDFs siguen
+excluidos de Git. Completa los datos de contacto en tus variables `APPLICANT_*`
+o en tu copia local de `candidate_bible.yaml`.
 
-| Archivo | Cambio necesario |
-| --- | --- |
-| `Christian_CV.docx` | Nuevo Word maestro con secciones de Christian. |
-| `main.py` | Ruta del Word, empresa y fechas reales del rol. |
-| `cv_maestro_cache.txt` | Se creará localmente desde el Word nuevo. |
-| `docx_adapter.py` | Nombre, encabezados, empresa/ancla del rol y límites de diseño. |
-| `gemini_service.py` | Prompts y validaciones: ya genera en español, pero conserva los límites del diseño anterior. |
-| `cv_date_guard.py` | Sustituir las fechas heredadas por las reales de Christian. |
-| `pdf_generator.py` | Revisar el nombre del archivo PDF. |
-| `candidate_bible.yaml` | Datos, experiencia, idiomas y preferencias reales. |
-| `form_filler.py` | Datos personales, ubicación, renta y contexto de Chile. |
-| `models.py` | Cambiar `CVAdaptation` si se reescriben secciones distintas. |
+La fuente de hechos del candidato se completa en memoria desde el Word local:
+identidad, contacto, experiencia, fechas, estudios, certificados, herramientas
+e idiomas. No escribe esos datos en el YAML versionado ni publica el Word.
+El CV maestro prevalece ante contradicciones con datos anteriores. Autorización
+laboral, disponibilidad, años totales y preferencias no documentadas quedan
+sin completar y requieren información proporcionada por el candidato.
 
-El CV generado y las respuestas de postulación se redactan en español.
-El template está pendiente y los datos del candidato están vacíos.
+Gemini genera en español y conserva los límites: título de 39–45 caracteres,
+perfil de 555–635, cuatro tareas de 140–200 cada una y 700–800 en total. La
+reparación dirigida recibe el CV maestro y la fuente de hechos del candidato,
+además de la oferta. No debe añadir habilidades que solo aparezcan en la oferta.
+La estrategia conserva una generación, reparación dirigida y un único intento
+completo adicional cuando sea necesario.
 
+El adaptador reconoce `Sobre mí`, `Experiencia`, la línea decorativa y las
+viñetas con numeración de Word aunque tengan estilo Normal. Solo cambia título,
+perfil y el primer rol de la sección Experiencia; preserva foto, fuentes, secciones y cargos
+anteriores. El backend lee el Word actual en cada generación, sin reutilizar
+un caché antiguo. Empresa y fechas se obtienen del Word; las variables
+`CV_CURRENT_COMPANY` y `CV_CURRENT_DATES`, si están definidas, deben coincidir.
+Todos los rangos de fechas laborales se comprueban después de adaptar.
 
-## Estado de esta versión pública
+La estimación de líneas conserva el control previo, pero no sustituye la
+revisión visual del PDF con las fuentes instaladas en la laptop. El documento
+maestro actual ocupa tres páginas; esta actualización no rediseña su paginación.
 
-Esta versión comienza con un historial nuevo y sin CV, PDFs generados, datos
-personales, cookies, archivos de trabajo ni claves del candidato anterior.
-Antes de generar/postular, añade tu Word maestro `Christian_CV.docx`, completa
-`candidate_bible.yaml` y las variables `APPLICANT_*`, y adapta las secciones,
-empresa y fechas reales. Configura `CV_CURRENT_COMPANY` y `CV_CURRENT_DATES`
-con los valores exactos del nuevo Word.
+### Verificación local
 
-El archivo Word no se incluye para mantener privados los datos personales.
-El adaptador y guardarraíl de fechas todavía deben ajustarse al template
-nuevo. La búsqueda puede configurarse mientras se prepara ese CV.
+```bash
+python -m unittest discover -s tests -p 'test_cv*.py' -v
+python -m unittest discover -s tests -p 'test_christian*.py' -v
+```
 
-Instala Python y LibreOffice; crea un entorno virtual e instala
-`pip install -r requirements.txt` y `playwright install chromium`.
-Si necesitas las dependencias JavaScript, ejecuta `npm install`.
-`node_modules` se regenera localmente y no se publica.
+Las pruebas del Word real necesitan `Christian_CV.docx`; se omiten cuando no
+está disponible. Las pruebas de prompts usan respuestas simuladas de Gemini,
+sin credenciales ni llamadas pagadas. Otras pruebas heredadas de filtros,
+Google Sheets y preferencias del candidato anterior siguen pendientes de
+migración al flujo de Christian.
 
-No subas CV, documentos personales, capturas ni `.env` al repositorio público.
+Instala las dependencias con `pip install -r requirements.txt` y
+`playwright install chromium`. Para PDF usa Word en Windows/WSL con
+`WORD_TO_PDF_SCRIPT`, o `PDF_ENGINE=libreoffice` con LibreOffice y las fuentes
+del documento instaladas. Reinicia el backend después de actualizar el código.

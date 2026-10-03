@@ -49,7 +49,10 @@ class MappingTests(unittest.TestCase):
             original_field="Why us?",
             answer_key="cover_letter",
         )
-        value = answer_for_decision(Candidate(), decision, {}, [], "I am motivated.", "Experience.", "", "")
+        field = Candidate()
+        field.label = "Why us?"
+        field.name = "cover_letter"
+        value = answer_for_decision(field, decision, {}, [], "I am motivated.", "Experience.", "", "")
         self.assertEqual(value, "I am motivated.")
 
 
