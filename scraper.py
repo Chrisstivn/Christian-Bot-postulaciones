@@ -266,6 +266,10 @@ def _extract_linkedin_rendered_work_format(url: str) -> str:
                 # filtering avoids mistaking a description sentence for the
                 # workplace badge.
                 for label, normalized in (
+                    ("Presencial", "On-site"),
+                    ("Híbrido", "Hybrid"),
+                    ("En remoto", "Remote"),
+                    ("Remoto", "Remote"),
                     ("On-site", "On-site"),
                     ("On site", "On-site"),
                     ("Hybrid", "Hybrid"),
@@ -541,11 +545,11 @@ def scrape_linkedin_search_results(search_url: str, max_jobs: int = 10000, start
 
 def _normalize_work_format(value: str) -> str:
     normalized = re.sub(r"[_\s]+", " ", value or "").strip().lower()
-    if normalized in ("hybrid", "hybrid work", "hybrid working"):
+    if normalized in ("hybrid", "hybrid work", "hybrid working", "híbrido", "hibrido", "híbrida", "hibrida"):
         return "Hybrid"
-    if normalized in ("remote", "fully remote", "telecommute", "telecommuting"):
+    if normalized in ("remote", "fully remote", "telecommute", "telecommuting", "remoto", "remota", "en remoto"):
         return "Remote"
-    if normalized in ("on-site", "onsite", "on site", "on-site work", "onsite work"):
+    if normalized in ("on-site", "onsite", "on site", "on-site work", "onsite work", "presencial"):
         return "On-site"
     return "Unknown"
 
@@ -626,11 +630,11 @@ def extract_work_format(text: str) -> str:
     value = re.sub(r"\s+", " ", text or "").strip().lower()
     # Prefer Hybrid before Remote: hybrid descriptions often mention
     # remote/home-office days elsewhere in the page text.
-    if re.search(r"\b(hybrid|hybrid work|hybrid working|hybrid workplace)\b", value):
+    if re.search(r"\b(hybrid|hybrid work|hybrid working|hybrid workplace|h[ií]brid[oa])\b", value):
         return "Hybrid"
-    if re.search(r"\b(remote|work from home|fully remote|100% remote|remote work)\b", value):
+    if re.search(r"\b(remote|work from home|fully remote|100% remote|remote work|remot[oa]|teletrabajo)\b", value):
         return "Remote"
-    if re.search(r"\b(on[- ]site|onsite|on site|workplace type: on-site)\b", value):
+    if re.search(r"\b(on[- ]site|onsite|on site|workplace type: on-site|presencial)\b", value):
         return "On-site"
     return "Unknown"
 

@@ -85,7 +85,7 @@ class ChristianCvTests(unittest.TestCase):
     def test_bible_contains_only_documented_candidate_facts(self):
         bible = load_candidate_bible(ROOT / 'candidate_bible.yaml', cv_path=SOURCE)
         self.assertEqual(bible.get_path('personal.full_name'), Document(SOURCE).paragraphs[1].text.split('|')[0].strip())
-        self.assertEqual(bible.get_path('languages.english.level'), 'C1 (Professional Working Proficiency)')
+        self.assertEqual(bible.get_path('languages.english.level'), 'C1')
         self.assertEqual(bible.get_path('personal.work_authorization'), '')
         self.assertNotIn('SQL', bible.get_path('skills.tools'))
         self.assertEqual(bible.get_path('professional.years_experience', ''), '')

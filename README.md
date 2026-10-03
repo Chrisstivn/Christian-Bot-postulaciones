@@ -114,8 +114,11 @@ un caché antiguo. Empresa y fechas se obtienen del Word; las variables
 `CV_CURRENT_COMPANY` y `CV_CURRENT_DATES`, si están definidas, deben coincidir.
 Todos los rangos de fechas laborales se comprueban después de adaptar.
 
-La estimación de líneas conserva el control previo, pero no sustituye la
-revisión visual del PDF con las fuentes instaladas en la laptop. El documento
+Además de los límites de caracteres, el PDF convertido se comprueba con
+sus líneas reales: encabezado de dos líneas, perfil de seis y máximo dos
+por tarea. Si falla, Gemini recibe una única reparación dirigida con el CV
+maestro; se convierte de nuevo y se comprueba. Si persiste, responde 422 y
+no entrega el PDF como listo. Esto no sustituye la revisión visual final. El documento
 maestro actual ocupa tres páginas; esta actualización no rediseña su paginación.
 
 ### Verificación local
@@ -135,3 +138,20 @@ Instala las dependencias con `pip install -r requirements.txt` y
 `playwright install chromium`. Para PDF usa Word en Windows/WSL con
 `WORD_TO_PDF_SCRIPT`, o `PDF_ENGINE=libreoffice` con LibreOffice y las fuentes
 del documento instaladas. Reinicia el backend después de actualizar el código.
+
+### QA de conversión y scraping
+
+La revisión real encontró y corrigió una diferencia entre el nombre del PDF
+creado y el enviado a n8n: los paréntesis de las iniciales se conservan.
+La carga de idiomas separa C1 de sus notas para que el autofill reconozca
+la fluidez, y los cargos actuales se consultan en los datos del Word.
+La normalización de modalidad reconoce también etiquetas españolas.
+`requirements.txt` incluye el adaptador PostgreSQL, el módulo de stealth
+usado por los fallbacks y el lector de PDF usado por el guardarraíl visual.
+
+La revisión completa incluye pruebas antiguas del proyecto anterior que
+esperan filtros, idiomas y nodos de Google Sheets ya eliminados. Las pruebas
+actuales del flujo de Christian son las de `test_christian*`,
+`test_search_filters`, `test_final_qa_regressions`, `test_cv*`,
+`test_linkedin_job_scrape_guard`, `test_job_extraction_shape` y
+`test_excel_output`. Validar Gemini real exige ADC en la laptop.

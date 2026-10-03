@@ -236,5 +236,5 @@ class ApplicationResult(BaseModel):
     @field_validator("pdf_name")
     @classmethod
     def safe_filename(cls, v):
-        # CV_{Company}_{JobTitle}.pdf, sin espacios ni caracteres raros
-        return re.sub(r"[^A-Za-z0-9_.-]", "_", v)
+        # Preserve the canonical job-title initials while excluding path separators.
+        return re.sub(r"[^A-Za-z0-9_().-]", "_", v)
