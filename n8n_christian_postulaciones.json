@@ -482,7 +482,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.search_urls_raw || '';\nconst maxJobs = $json.max_jobs;\nconst backlogPages = $json.backlog_pages;\nconst urls = raw.split('\\n').map(s => s.trim()).filter(Boolean);\nreturn urls.map(u => ({ json: { search_url: u, max_jobs: maxJobs, backlog_pages: backlogPages } }));"
+        "jsCode": "const raw = $json.search_urls_raw || '';\nconst maxJobs = $json.max_jobs;\nconst backlogPages = $json.backlog_pages;\nconst urls = [...new Set(raw.split(/\\s+/).map(s => s.trim()).filter(Boolean))];\nreturn urls.map(u => ({ json: { search_url: u, max_jobs: maxJobs, backlog_pages: backlogPages } }));"
       },
       "id": "233c3acd-9a84-4730-9d76-f58c7d7b98bb",
       "name": "Split Search URLs",
