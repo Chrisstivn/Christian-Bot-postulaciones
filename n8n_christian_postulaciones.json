@@ -184,12 +184,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/linkedin-search-and-triage",
+        "url": "http://host.docker.internal:8000/linkedin-search-tasks",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { search_url: $json.search_url, max_jobs: $json.max_jobs || 10000, backlog_pages: $json.backlog_pages || 2 } }}",
         "options": {
-          "timeout": 3600000
+          "timeout": 30000
         }
       },
       "id": "a610e98d-35cf-4ede-8387-d6f0632d265e",
@@ -200,7 +200,10 @@
         26944,
         -14608
       ],
-      "notes": "El backend revisa start=0 para nuevas + backlog paginado. Usa new_job_urls para no mandar duplicados al triage."
+      "notes": "Inicia una búsqueda persistida y devuelve task_id inmediatamente. Reintentos reutilizan la tarea.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "parameters": {
@@ -785,6 +788,87 @@
         -14720
       ],
       "notes": "Se ejecuta una sola vez después de que el backend termina TODA la búsqueda; recién ahí avanza el outer loop."
+    },
+    {
+      "id": "search-poll-wait",
+      "name": "Esperar búsqueda (10 s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -848,
+        -272
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "search-poll-http",
+      "name": "Consultar progreso LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -624,
+        -272
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"http://host.docker.internal:8000/linkedin-search-tasks/\" + $json.task_id }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "search-poll-errors",
+      "name": "Comprobar tarea LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -272
+      ],
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  if (item.json.state === 'failed') throw new Error(item.json.error || 'La búsqueda falló en el backend');\n  if (!['queued', 'running', 'completed'].includes(item.json.state)) throw new Error('Estado de búsqueda desconocido');\n}\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "search-poll-complete",
+      "name": "¿Búsqueda terminada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        -272
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "search-state-completed",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -865,12 +949,7 @@
       "main": [
         [
           {
-            "node": "Split ready_jobs (backend triage)",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Avanzar siguiente search",
+            "node": "Esperar búsqueda (10 s)",
             "type": "main",
             "index": 0
           }
@@ -1086,6 +1165,62 @@
         [
           {
             "node": "Loop Over Search Links (1 a la vez)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar búsqueda (10 s)": {
+      "main": [
+        [
+          {
+            "node": "Consultar progreso LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar progreso LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Comprobar tarea LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar tarea LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "¿Búsqueda terminada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Búsqueda terminada?": {
+      "main": [
+        [
+          {
+            "node": "Split ready_jobs (backend triage)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Avanzar siguiente search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Esperar búsqueda (10 s)",
             "type": "main",
             "index": 0
           }

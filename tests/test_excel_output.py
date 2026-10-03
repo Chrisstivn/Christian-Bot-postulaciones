@@ -82,8 +82,16 @@ class ExcelOutputTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "n8n_christian_postulaciones.json"
         data = json.loads(path.read_text())
         self.assertFalse(data["active"])
-        self.assertEqual(len(data["nodes"]), 32)
         names = {node["name"] for node in data["nodes"]}
+        self.assertEqual(len(names),len(data["nodes"]))
+        nodes = {node['name']:node for node in data['nodes']}
+        self.assertTrue(nodes['Call LinkedIn Search']['parameters']['url'].endswith('/linkedin-search-tasks'))
+        self.assertEqual(nodes['Call LinkedIn Search']['parameters']['options']['timeout'],30000)
+        self.assertEqual(nodes['Esperar búsqueda (10 s)']['parameters']['amount'],10)
+        completion = data['connections']['¿Búsqueda terminada?']['main']
+        self.assertEqual(completion[1][0]['node'],'Esperar búsqueda (10 s)')
+        self.assertEqual({edge['node'] for edge in completion[0]},
+                         {'Split ready_jobs (backend triage)','Avanzar siguiente search'})
         self.assertFalse(any("EXACT80" in name or "EXACT 80" in name for name in names))
         for name, ports in data["connections"].items():
             self.assertIn(name, names)

@@ -144,6 +144,22 @@ del documento instaladas. Reinicia el backend después de actualizar el código.
 
 ### QA de conversión y scraping
 
+El flujo inicia LinkedIn mediante `POST /linkedin-search-tasks` (202 con
+`task_id`) y consulta `GET /linkedin-search-tasks/{task_id}` cada diez segundos.
+Así no mantiene una petición abierta durante todo el scraping y triage de
+Gemini. Los estados son queued, running, completed y failed. Solo completed
+entrega ofertas a Excel y avanza a la siguiente búsqueda; failed muestra el
+error del backend. Las peticiones usan timeout de 30 segundos y tres intentos.
+Un reintento del inicio reutiliza la tarea activa o su resultado reciente.
+
+Ejecuta un único proceso de uvicorn, sin `--workers` ni `--reload`: el trabajador
+serializa las búsquedas y guarda sus estados/resultados en
+`work/linkedin_search_runs.sqlite3`. Si reinicias durante una búsqueda, se
+marca interrumpida; las ofertas descubiertas siguen en la cola PostgreSQL y
+puedes iniciar de nuevo para procesar las pendientes. Actualiza backend y
+JSON juntos. n8n Cloud necesita la URL pública del túnel; 127.0.0.1 solo sirve
+cuando n8n y el backend corren en el mismo equipo.
+
 La revisión real encontró y corrigió una diferencia entre el nombre del PDF
 creado y el enviado a n8n: los paréntesis de las iniciales se conservan.
 La carga de idiomas separa C1 de sus notas para que el autofill reconozca

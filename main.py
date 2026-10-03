@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 import logging
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -33,6 +34,7 @@ import job_quality
 import search_state
 import excel_output
 import scraper
+from background_search import SearchRunner
 import form_filler
 from application_agent.metrics import metrics
 from candidate_bible import load_candidate_bible
@@ -556,6 +558,31 @@ def _triage_job_url(job_url: str) -> dict:
 @app.post("/triage-job")
 def triage_job(payload: TriageInput):
     return _triage_job_url(payload.url)
+
+
+_search_runner = None
+_search_runner_lock = threading.Lock()
+
+
+def _get_search_runner():
+    global _search_runner
+    with _search_runner_lock:
+        if _search_runner is None:
+            _search_runner = SearchRunner(lambda data: linkedin_search_and_triage(LinkedInSearchInput(**data)))
+    return _search_runner
+
+
+@app.post("/linkedin-search-tasks", status_code=202)
+def start_linkedin_search_task(payload: LinkedInSearchInput):
+    return _get_search_runner().start(payload.model_dump())
+
+
+@app.get("/linkedin-search-tasks/{task_id}")
+def linkedin_search_task_status(task_id: str):
+    try:
+        return _get_search_runner().status(task_id)
+    except KeyError:
+        raise HTTPException(404, "Search task not found; restart the search from its start node.")
 
 
 @app.post("/linkedin-search-and-triage")
