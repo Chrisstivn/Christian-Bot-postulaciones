@@ -30,6 +30,7 @@ import neo4j_service
 import queue_service
 import job_quality
 import search_state
+import excel_output
 import scraper
 import form_filler
 from application_agent.metrics import metrics
@@ -45,6 +46,12 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("job-app-backend")
 
 app = FastAPI(title="Job Application Automation Backend")
+app.include_router(excel_output.router)
+
+
+@app.on_event("startup")
+def initialize_output_excel():
+    excel_output.ensure_workbook()
 
 CV_MAESTRO_DOCX = os.environ.get("CV_MAESTRO_DOCX", "Christian_CV.docx")
 CV_MAESTRO_TXT_CACHE = Path("cv_maestro_cache.txt")

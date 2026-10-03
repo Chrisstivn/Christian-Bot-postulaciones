@@ -138,176 +138,50 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "mode": "url",
-          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
-          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Postulaciones",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Link": "={{ $json.job_url }}",
-            "Status": "NEW",
-            "company": "={{ $json.company }}",
-            "job_title": "={{ $json.job_title }}",
-            "added_at": "={{ $now.toISO() }}",
-            "reason": "={{ ($json.baseline_level || '') + ' | ' + ($json.upgrade_reason || '') }}"
-          },
-          "schema": [
-            {
-              "id": "Link",
-              "displayName": "Link",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Status",
-              "displayName": "Status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "real_apply_url",
-              "displayName": "real_apply_url",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "company",
-              "displayName": "company",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "job_title",
-              "displayName": "job_title",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "added_at",
-              "displayName": "added_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "ID",
-              "displayName": "ID",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "pdf_name",
-              "displayName": "pdf_name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "download_url",
-              "displayName": "download_url",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "reason",
-              "displayName": "reason",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
             }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
+          }
         },
-        "options": {}
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"Link\": ($json.job_url), \"Status\": (\"NEW\"), \"company\": ($json.company), \"job_title\": ($json.job_title), \"added_at\": ($now.toISO()), \"reason\": (($json.baseline_level || '') + ' | ' + ($json.upgrade_reason || ''))}, matching_columns: [\"Link\"], preserve_existing: true } }}"
       },
       "id": "9ec56c33-4997-4c20-a645-8b8ec5e29bf5",
       "name": "Save New URLs for Review1",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -352,
         -2192
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      },
-      "notes": "APPEND ONLY. Upstream guard guarantees Link does not already exist in Postulaciones. Never use appendOrUpdate here: it can downgrade READY/DONE/pdf_ready/easyapply_pdfready to NEW."
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "mode": "url",
-          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
-          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Postulaciones",
-          "mode": "name"
-        },
-        "options": {}
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "04785e3e-50a0-4e37-9a4a-555c77c4f0d6",
       "name": "Get Rows from Sheet1",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -1152,
         -1696
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      }
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     },
     {
       "parameters": {
@@ -375,109 +249,76 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "operation": "appendOrUpdate",
-        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
-        "sheetName": "Postulaciones",
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "real_apply_url": "={{ $('Filter Ready1').item.json.real_apply_url }}",
-            "Status": "DISCARDED",
-            "company": "={{ $json.company || '' }}",
-            "job_title": "={{ $json.job_title || '' }}",
-            "reason": "={{ $json.reason || '' }}"
-          },
-          "matchingColumns": [
-            "real_apply_url"
-          ]
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         },
-        "options": {}
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($('Filter Ready1').item.json.real_apply_url), \"Status\": (\"DISCARDED\"), \"company\": ($json.company || ''), \"job_title\": ($json.job_title || ''), \"reason\": ($json.reason || '')}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
       },
       "id": "e3eb90f7-29f1-4196-be61-f59033f8c447",
       "name": "Save Discarded1",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -352,
         -1888
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      }
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "operation": "appendOrUpdate",
-        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
-        "sheetName": "Postulaciones",
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "real_apply_url": "={{ $('Filter Ready1').item.json.real_apply_url }}",
-            "Status": "DONE",
-            "ID": "={{ $json.ID }}",
-            "company": "={{ $json.company }}",
-            "job_title": "={{ $json.job_title }}",
-            "pdf_name": "={{ $json.pdf_name }}",
-            "download_url": "={{ $json.download_url }}"
-          },
-          "matchingColumns": [
-            "real_apply_url"
-          ]
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         },
-        "options": {}
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($('Filter Ready1').item.json.real_apply_url), \"Status\": (\"DONE\"), \"ID\": ($json.ID), \"company\": ($json.company), \"job_title\": ($json.job_title), \"pdf_name\": ($json.pdf_name), \"download_url\": ($json.download_url)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
       },
       "id": "4faf98f8-9910-42bb-8744-8255546055a1",
       "name": "Save Success1",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -352,
         -1488
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      }
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "mode": "url",
-          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
-          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Postulaciones",
-          "mode": "name"
-        },
-        "options": {}
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "5d3aeb2e-5a8c-4fb8-8b94-0e3a8ef7e101",
       "name": "Snapshot Existing Sheet Links1",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -1456,
         -2192
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      },
-      "notes": "Read-only snapshot before LinkedIn search. Existing Sheet Links are terminal for discovery: they must never be rewritten to NEW."
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets.",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -508,7 +349,6 @@
       "notes": "Hard Sheet-level dedup. Even if Postgres is stale/reset, a Link already present in Postulaciones never reaches triage and can never be downgraded."
     }
   ],
-  "pinData": {},
   "connections": {
     "Schedule (Buscar en LinkedIn)": {
       "main": [
@@ -676,4 +516,3 @@
   "id": "BvlvOT88XMYdEraL",
   "tags": []
 }
-

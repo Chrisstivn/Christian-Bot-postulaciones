@@ -18,3 +18,5 @@ linkedin_search_state.json
 *.docx
 *.pdf
 *.save
+data/*.xlsx
+data/*.xlsx.lock

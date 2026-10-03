@@ -14,34 +14,25 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "mode": "url",
-          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
-          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Postulaciones",
-          "mode": "name"
-        },
-        "options": {}
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "3ee964bb-2f22-4a57-b33d-002-checkjobs",
       "name": "Get Jobs from Sheet",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -480,
         0
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      }
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     },
     {
       "parameters": {
@@ -111,37 +102,28 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "operation": "appendOrUpdate",
-        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
-        "sheetName": "Postulaciones",
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Link": "={{ $json.url }}",
-            "Status": "CLOSED",
-            "reason": "={{ 'LinkedIn: ' + ($json.reason || 'no longer accepting applications') }}"
-          },
-          "matchingColumns": [
-            "Link"
-          ]
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         },
-        "options": {}
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"Link\": ($json.url), \"Status\": (\"CLOSED\"), \"reason\": ('LinkedIn: ' + ($json.reason || 'no longer accepting applications'))}, matching_columns: [\"Link\"], preserve_existing: false } }}"
       },
       "id": "3ee964bb-2f22-4a57-b33d-006-checkjobs",
       "name": "Mark CLOSED in Sheet",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         480,
         0
       ],
-      "credentials": {
-        "googleApi": {
-          "id": "Peq26MAhpPCTvMSf",
-          "name": "Google Sheets account 2"
-        }
-      }
+      "notes": "Excel local del proyecto: data/postulaciones.xlsx. Sin conexión a Google Sheets."
     }
   ],
   "connections": {

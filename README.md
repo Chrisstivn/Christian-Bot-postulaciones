@@ -8,7 +8,30 @@ Reemplaza esa URL por la búsqueda que quieras: sus filtros se respetan.
 Gemini ya no verifica el idioma ni si alemán es requisito. Se mantienen la
 deduplicación, las ofertas cerradas y los fallos de scraping/extracción.
 
-## Credenciales locales
+## Excel de resultados local
+
+Los flujos n8n de este repositorio leen y escriben `data/postulaciones.xlsx`,
+en la pestaña `Postulaciones`, mediante el backend. Ya no usan el Google Sheets
+del proyecto anterior ni sus credenciales. El archivo se crea automáticamente
+al iniciar el backend. También puedes crearlo antes con `python excel_output.py`,
+después de instalar `pip install -r requirements.txt`.
+
+Importa de nuevo el JSON del flujo que uses en n8n y reinicia el backend para
+activar esta salida. Las URLs usan `http://host.docker.internal:8000` como los
+demás nodos: si n8n corre directamente en la laptop, usa `http://localhost:8000`.
+
+Abre el archivo en Excel o LibreOffice para revisar ofertas y cambiar `Status`
+de `NEW` a `READY` cuando quieras procesarlas. Guarda y cierra el archivo antes
+de ejecutar el bot. Las columnas `Link`, `real_apply_url` y `Status` conservan sus
+nombres para que los filtros del flujo sigan funcionando. Los resultados nuevos
+se agregan sin resetear el estado de ofertas existentes; los resultados finales
+actualizan la fila correspondiente.
+
+Puedes descargarlo en `http://localhost:8000/excel-output/download` o cambiar
+su ubicación con `OUTPUT_EXCEL_PATH`. El Excel y su archivo de bloqueo están
+excluidos de Git; cada clon crea su propio archivo vacío sin publicar resultados.
+
+### Configuración de credenciales
 
 Copia `.env.example` a `.env` y completa tu propia clave
 `VERTEX_EXPRESS_API_KEY` y las credenciales de tus bases de datos.
