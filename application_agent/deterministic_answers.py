@@ -244,11 +244,11 @@ def resolve_known_answer(
             return AnswerResolution(value, "candidate_bible", 0.98, "years_experience")
 
     if _has(text, "current company", "current employer", "present employer"):
-        value = _bible_value(bible, "career.current_company")
+        value = (_bible_value(bible, "professional.current_company") or _bible_value(bible, "career.current_company"))
         return AnswerResolution(value, "candidate_bible", 0.95, "current_company") if value else None
 
     if _has(text, "current position", "current job title", "current role", "present title"):
-        value = _bible_value(bible, "career.current_position")
+        value = (_bible_value(bible, "professional.current_position") or _bible_value(bible, "career.current_position"))
         return AnswerResolution(value, "candidate_bible", 0.95, "current_position") if value else None
 
     # ------------------------------------------------------------------
@@ -257,21 +257,21 @@ def resolve_known_answer(
     if _has(text, "english", "englisch"):
         value = _bible_value(bible, "languages.english.level")
         if value and _has(text, "fluent", "proficient", "professional working proficiency", "business fluent"):
-            yes = _norm(value) in ("c1", "c2", "native")
+            yes = _norm(value) in ("c1", "c2", "native", "nativo", "nativa")
             return AnswerResolution("Yes" if yes else "No", "candidate_bible", 1.0, "english_fluency")
         return AnswerResolution(value, "candidate_bible", 0.99, "english_level") if value else None
 
     if _has(text, "german", "deutsch"):
         value = _bible_value(bible, "languages.german.level")
         if value and _has(text, "fluent", "proficient", "business fluent"):
-            yes = _norm(value) in ("c1", "c2", "native")
+            yes = _norm(value) in ("c1", "c2", "native", "nativo", "nativa")
             return AnswerResolution("Yes" if yes else "No", "candidate_bible", 1.0, "german_fluency")
         return AnswerResolution(value, "candidate_bible", 0.99, "german_level") if value else None
 
     if _has(text, "spanish", "espanol", "español"):
         value = _bible_value(bible, "languages.spanish.level")
         if value and _has(text, "fluent", "proficient", "native"):
-            yes = _norm(value) in ("c1", "c2", "native")
+            yes = _norm(value) in ("c1", "c2", "native", "nativo", "nativa")
             return AnswerResolution("Yes" if yes else "No", "candidate_bible", 1.0, "spanish_fluency")
         return AnswerResolution(value, "candidate_bible", 0.99, "spanish_level") if value else None
 

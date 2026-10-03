@@ -53,7 +53,7 @@ class ChristianCvTests(unittest.TestCase):
             cv_date_guard.verify_immutable_dates(str(SOURCE), str(out))
             actual = Document(out)
             self.assertEqual(len(source.paragraphs), len(actual.paragraphs))
-            changed = {1, 9, 20, 23, 24, 25, 26}
+            changed = {1, 9, 20, 23, 24, 25, 26, 27, 35}
             for i, (before, after) in enumerate(zip(source.paragraphs, actual.paragraphs)):
                 if i not in changed:
                     self.assertEqual(before._p.xml, after._p.xml, f'Paragraph {i} changed')
@@ -61,6 +61,12 @@ class ChristianCvTests(unittest.TestCase):
             self.assertEqual([actual.paragraphs[i].text for i in [23,24,25,26]], TASKS)
             self.assertEqual(len(source.inline_shapes), len(actual.inline_shapes))
             self.assertEqual(source.sections[0]._sectPr.xml, actual.sections[0]._sectPr.xml)
+            for heading, date in [(20,21),(27,28),(35,36)]:
+                self.assertEqual(actual.paragraphs[heading].paragraph_format.left_indent,
+                                 actual.paragraphs[date].paragraph_format.left_indent)
+                self.assertEqual(actual.paragraphs[heading].paragraph_format.first_line_indent,0)
+                self.assertEqual(source.paragraphs[heading].text.split(',')[-1],
+                                 actual.paragraphs[heading].text.split(',')[-1])
 
     @unittest.skipUnless(SOURCE.exists(), "Place the local Christian_CV.docx to test the real template")
     def test_historical_date_change_is_rejected(self):
@@ -85,7 +91,7 @@ class ChristianCvTests(unittest.TestCase):
     def test_bible_contains_only_documented_candidate_facts(self):
         bible = load_candidate_bible(ROOT / 'candidate_bible.yaml', cv_path=SOURCE)
         self.assertEqual(bible.get_path('personal.full_name'), Document(SOURCE).paragraphs[1].text.split('|')[0].strip())
-        self.assertEqual(bible.get_path('languages.english.level'), 'C1 (Professional Working Proficiency)')
+        self.assertEqual(bible.get_path('languages.english.level'), 'C1')
         self.assertEqual(bible.get_path('personal.work_authorization'), '')
         self.assertNotIn('SQL', bible.get_path('skills.tools'))
         self.assertEqual(bible.get_path('professional.years_experience', ''), '')

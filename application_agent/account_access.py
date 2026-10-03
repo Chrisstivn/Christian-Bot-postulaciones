@@ -384,8 +384,8 @@ def _verification_score(subject: str, sender: str, body: str, tokens: set[str]) 
 
 def _extract_verification_code(text: str) -> str:
     patterns = (
-        r"(?:verification|verify|security|one[- ]time|otp|confirmation)\s*(?:code)?\s*[:\-]?\s*([0-9]{4,8})",
-        r"\bcode\s*[:\-]?\s*([0-9]{4,8})\b",
+        r"(?:verification|verify|security|one[- ]time|otp|confirmation)\s*(?:code)?\s*(?:is\s+|es\s+)?[:\-]?\s*([0-9]{4,8})\b",
+        r"\b(?:code|c[oó]digo(?:\s+de\s+verificaci[oó]n)?)\s*(?:is\s+|es\s+)?[:\-]?\s*([0-9]{4,8})\b",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)

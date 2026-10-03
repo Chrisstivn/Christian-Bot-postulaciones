@@ -322,7 +322,13 @@ def _add_local_cv_facts(bible: CandidateBible, cv_path: Path) -> CandidateBible:
         parts = re.split(r"\s+[–—-]\s+", line, maxsplit=1)
         if len(parts) == 2:
             language, level = parts
-            languages[aliases.get(language.casefold(), language.casefold())] = {"level": level.strip()}
+            notes = ""
+            match = re.fullmatch(r"\s*(.*?)\s*\(([^()]*)\)\s*", level)
+            if match:
+                level, notes = match.groups()
+            languages[aliases.get(language.casefold(), language.casefold())] = {
+                "level": level.strip(), "notes": notes.strip()}
+
     if languages:
         bible.data["languages"] = languages
     return bible

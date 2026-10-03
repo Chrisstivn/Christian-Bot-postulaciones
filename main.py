@@ -26,6 +26,7 @@ import gemini_service
 import docx_adapter
 import cv_date_guard
 import pdf_generator
+import pdf_layout_guard
 import neo4j_service
 import queue_service
 import job_quality
@@ -162,6 +163,28 @@ def _build_application_pdf_artifacts(payload: ScrapeInput, app_id: str) -> dict:
         )
     except Exception as e:
         raise HTTPException(500, f"Fallo PDF: {e}")
+
+    # Measure the actual PDF using the real fonts. One targeted repair is
+    # allowed; a PDF that still wraps incorrectly is never returned as ready.
+    full_name = cv_maestro_text.split("|", 1)[0].strip()
+    layout_problems = pdf_layout_guard.validate_pdf_layout(final_pdf_path, adaptation, full_name, expected_pages=2)
+    if layout_problems:
+        try:
+            if any(p['field'] == 'pagination' for p in layout_problems):
+                raise ValueError(f"La plantilla debe ocupar dos páginas, con Habilidades en la segunda: {layout_problems}")
+            adaptation = gemini_service.repair_rendered_cv_layout(
+                adaptation, cv_maestro_text, job_text,
+                candidate_bible.to_gemini_context(), layout_problems)
+            gemini_service.verify_cv_adaptation_safety(adaptation, current_role.company, current_role.dates)
+            docx_adapter.apply_cv_adaptation(CV_MAESTRO_DOCX, str(adapted_docx_path), adaptation.model_dump())
+            cv_date_guard.verify_immutable_dates(CV_MAESTRO_DOCX, str(adapted_docx_path))
+            final_pdf_path = pdf_generator.build_final_pdf(str(adapted_docx_path), pdf_name)
+            remaining = pdf_layout_guard.validate_pdf_layout(final_pdf_path, adaptation, full_name, expected_pages=2)
+            if remaining:
+                raise ValueError(f"El PDF sigue sin cumplir las líneas del CV: {remaining}")
+        except Exception as e:
+            Path(final_pdf_path).unlink(missing_ok=True)
+            raise HTTPException(422, f"Fallo de layout del PDF; no se entregó un CV desalineado: {e}")
 
     # Source of truth for Sheet/download metadata: the file that was actually
     # written to output_pdfs. This prevents n8n/Sheet metadata from ever

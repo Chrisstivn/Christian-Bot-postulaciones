@@ -29,6 +29,7 @@ import re
 from docx import Document
 from docx.text.paragraph import Paragraph
 from docx.enum.section import WD_SECTION_START
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.shared import Pt
@@ -686,6 +687,31 @@ def _normalize_experience_task_font_sizes(
 # 6. Orquestador
 # ---------------------------------------------------------------------------
 
+def _align_experience_role_headings(doc: Document) -> None:
+    """Align each role with its date instead of inheriting a double indent."""
+    in_experience = False
+    for index, paragraph in enumerate(doc.paragraphs):
+        text = paragraph.text.strip().casefold()
+        if text in {'experiencia', 'experience', 'berufserfahrung'}:
+            in_experience = True
+            continue
+        if not in_experience:
+            continue
+        if paragraph.style.name.lower() == 'heading 1' and not _is_separator(paragraph):
+            break
+        if paragraph.style.name.lower() != 'heading 2' or ',' not in paragraph.text:
+            continue
+        following = next((p for p in doc.paragraphs[index + 1:] if p.text.strip()), None)
+        if following is None or not re.search(r'\d{4}', following.text):
+            continue
+        indent = following.paragraph_format.left_indent
+        if indent is None:
+            indent = following.style.paragraph_format.left_indent
+        paragraph.paragraph_format.left_indent = indent or Pt(0)
+        paragraph.paragraph_format.first_line_indent = Pt(0)
+        paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+
 def apply_cv_adaptation(input_path: str, output_path: str, adaptation: dict) -> str:
     """
     adaptation: dict con las keys de models.CVAdaptation
@@ -698,6 +724,7 @@ def apply_cv_adaptation(input_path: str, output_path: str, adaptation: dict) -> 
     update_profile(doc, adaptation["nuevo_perfil"])
     role_idx = update_current_role_title(doc, adaptation["nuevo_cargo_actual"])
     update_current_role_bullets(doc, role_idx, adaptation["nuevas_tareas"])
+    _align_experience_role_headings(doc)
     # Preserve the source CV fonts, section settings and historical formatting.
 
     doc.save(output_path)

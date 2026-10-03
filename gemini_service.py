@@ -1083,6 +1083,40 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
     return adaptation
 
 
+def repair_rendered_cv_layout(adaptation: CVAdaptation, cv_maestro_text: str,
+                              job_text: str, candidate_context: str, problems: list[dict]) -> CVAdaptation:
+    """One source-grounded rewrite of only fields failing the real PDF guard."""
+    keys = sorted({p["field"] for p in problems} & {"nuevo_titulo", "nuevo_perfil", "nuevas_tareas"})
+    prompt = """
+Repara SOLO los campos solicitados de un CV que ya fue renderizado a PDF.
+Devuelve JSON estricto con solo esos campos. Todo en español. Conserva los
+hechos del CV_MAESTRO; no inventes herramientas, logros, años ni funciones.
+No modifiques empresa, fechas, cargo actual ni roles históricos.
+Mantén título 39-45 caracteres y exactamente 2 líneas contando nombre y |.
+Mantén perfil 555-635 caracteres, oraciones completas y exactamente 6 líneas.
+Si el perfil actual ocupa 7 o más líneas, apunta a 555-580 caracteres y usa
+palabras de ancho menor. Si ocupa menos de 6, desarrolla hechos reales sin
+superar 635. Nunca lo cortes mecánicamente ni cambies la fuente.
+Tareas: exactamente 4, pasado, 140-200 cada una y 700-800 en total; máximo 2
+líneas cada una. Usa frases completas. Sin guiones, rayas ni coma antes de y.
+No uses orchestrated, engineered, leveraged, owned, translated, collaborated,
+defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
+"""
+    content = (f"CV_MAESTRO:\n{cv_maestro_text}\n\n{candidate_context}\n"
+               f"JOB_DESCRIPTION:\n{job_text}\n"
+               f"PROBLEMAS DEL PDF REAL:\n{json.dumps(problems, ensure_ascii=False)}\n"
+               f"CAMPOS A DEVOLVER: {json.dumps(keys)}\n"
+               f"TEXTO ACTUAL:\n{adaptation.model_dump_json()}")
+    raw = _call_gemini_json(prompt, content)
+    if not isinstance(raw, dict) or set(raw) != set(keys):
+        raise ValueError("La reparación del PDF debe devolver solo los campos solicitados")
+    repaired = CVAdaptation.model_validate({**adaptation.model_dump(), **raw})
+    failures = _validate_adaptation(repaired)
+    if failures:
+        raise ValueError("La reparación del PDF incumplió los guardarraíles: " + "; ".join(failures))
+    return repaired
+
+
 def _normalize_date_range(s: str) -> str:
     """Normaliza formato COSMÉTICO de un rango de fechas (paréntesis, tipo
     de guión/raya, espacios repetidos) para comparar el CONTENIDO real de
