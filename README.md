@@ -1,12 +1,35 @@
 # Christian Bot postulaciones
 
-Búsquedas para Chile sin restricciones de idioma, país, cargo, experiencia,
-modalidad ni contrato. Los flujos n8n empiezan con `location=Chile`, sin
-keywords, filtros de experiencia ni ventanas de fecha predefinidas.
-Reemplaza esa URL por la búsqueda que quieras: sus filtros se respetan.
+Búsquedas para Chile con filtros de empresa, modalidad, cargo y experiencia.
+La URL de búsqueda y sus filtros siguen siendo editables; no se descarta por
+idioma ni nacionalidad del empleador si cumple estas reglas:
 
-Gemini ya no verifica el idioma ni si alemán es requisito. Se mantienen la
-deduplicación, las ofertas cerradas y los fallos de scraping/extracción.
+| Regla | Sectores generales | Minería, faenas y servicios mineros dedicados |
+| --- | --- | --- |
+| Tamaño | Mediana o grande (50+ empleados por defecto) | Mismo requisito |
+| Operaciones | Multinacional | Chilena o extranjera; no necesita ser multinacional |
+| Modalidad | Híbrida o remota | También presencial o en faena |
+| Prácticas | Excluidas | Excluidas |
+| Cargo | Sin director, gerente, gerencia ni vicepresidente/VP | Mismas exclusiones |
+| Experiencia obligatoria | Máximo 4 años | Mismo límite |
+
+Project Manager, junior y trainee no se excluyen por esas palabras solas.
+Un rango de 3–5 años admite candidatos con 3: pasa este filtro. Una exigencia
+mínima de 5+ o más de 4 años se descarta; experiencia solo deseable no se usa
+como mínimo. La excepción minera necesita evidencia del sector o del trabajo
+en faena, no una mención casual de clientes o experiencia minera deseable.
+
+La misma llamada de Gemini que extrae la oferta recoge citas para los filtros.
+No adivina tamaño o multinacionalidad por reputación, nombre o país de origen.
+Si faltan datos para resolver una regla, la oferta queda en `FILTER_REVIEW`
+en el Excel, con el motivo en `reason` y `Revisar`. No se trata como aceptada
+ni se prepara un PDF automáticamente. Los rechazos guardan motivos específicos.
+La reconciliación de la cola conserva también las ofertas de revisión.
+
+`SEARCH_POLICY=christian` es el valor activo por defecto.
+`SEARCH_MIN_COMPANY_EMPLOYEES=50` permite ajustar el umbral del tamaño.
+`SEARCH_POLICY=unrestricted` desactiva explícitamente esta política si alguna
+vez se necesita. Las exclusiones opcionales adicionales siguen disponibles.
 
 ## Excel de resultados local
 

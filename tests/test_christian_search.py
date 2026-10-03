@@ -34,6 +34,7 @@ def load_pipeline_functions():
 class ChristianSearchTests(unittest.TestCase):
     def setUp(self):
         self.env_patch = patch.dict(os.environ, {
+            "SEARCH_POLICY": "unrestricted",
             "SEARCH_EXCLUDED_TITLE_REGEX": "",
             "SEARCH_ALLOWED_WORK_FORMATS": "",
             "SEARCH_EXCLUDED_CONTRACT_TYPES": "",

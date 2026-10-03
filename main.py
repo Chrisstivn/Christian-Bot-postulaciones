@@ -391,9 +391,9 @@ def _triage_job_url(job_url: str) -> dict:
     Order is intentional:
       1) DB status guard/dedup
       2) scrape / closed-job check
-      3) optional user-configured title/work-format/contract filters
+      3) employer, title, experience and workplace filters with mining exceptions
       4) no country or language exclusions
-      5) ready_for_review (NO salary estimates, scope AI or CV fit)
+      5) accepted rows or separate filter_review rows when evidence is missing
     """
     existing = queue_service.get_by_url(job_url)
     if existing and existing["status"] not in ("triage_pending", "failed"):
@@ -441,7 +441,7 @@ def _triage_job_url(job_url: str) -> dict:
             }
 
     try:
-        job_info = gemini_service.extract_job_info(job_text, include_questions=False)
+        job_info = gemini_service.extract_job_info(job_text, include_questions=False, include_search_filters=True)
     except Exception as e:
         queue_service.upsert_triage_result(
             job_url,
@@ -452,17 +452,18 @@ def _triage_job_url(job_url: str) -> dict:
         )
         return {"status": "failed", "job_url": job_url, "error": str(e)}
 
-    # Language metadata is retained for API compatibility, without detection
-    # or eligibility checks. Filters below are optional and disabled by default.
+    # One Gemini call extracts the job and cited filter facts. No language gate.
     language = ""
-    upgrade = job_quality.evaluate_upgrade(
+    upgrade = job_quality.evaluate_search_filters(
         company=job_info.company,
         job_title=job_info.job_title,
         job_text=job_text,
         work_format=work_format,
+        evidence=getattr(job_info, "search_filter_evidence", None),
     )
+    filter_decision = upgrade.comparison.get("decision", "KEEP" if upgrade.keep else "REJECT")
 
-    if not upgrade.keep:
+    if filter_decision == "REJECT":
         rejected_reason = upgrade.rejected_reason or "title_work_format_excluded"
         queue_service.upsert_triage_result(
             job_url,
@@ -497,7 +498,7 @@ def _triage_job_url(job_url: str) -> dict:
 
     queue_service.upsert_triage_result(
         job_url,
-        status="ready_for_review",
+        status="filter_review" if filter_decision == "REVIEW" else "ready_for_review",
         language=language,
         company=job_info.company,
         job_title=job_info.job_title,
@@ -514,7 +515,8 @@ def _triage_job_url(job_url: str) -> dict:
         last_error=None,
     )
     return {
-        "status": "ready",
+        "status": "review" if filter_decision == "REVIEW" else "ready",
+        "search_filter_decision": filter_decision,
         "job_url": job_url,
         "company": job_info.company,
         "job_title": job_info.job_title,
@@ -562,6 +564,7 @@ def linkedin_search_and_triage(payload: LinkedInSearchInput):
             triage_urls.append(url)
 
     ready_jobs = []
+    review_jobs = []
     discarded_count = 0
     failed_count = 0
     duplicate_count = 0
@@ -571,6 +574,8 @@ def linkedin_search_and_triage(payload: LinkedInSearchInput):
         status = result.get("status")
         if status == "ready":
             ready_jobs.append(result)
+        elif status == "review":
+            review_jobs.append(result)
         elif status == "discarded":
             discarded_count += 1
         elif status == "failed":
@@ -596,6 +601,8 @@ def linkedin_search_and_triage(payload: LinkedInSearchInput):
         "failed_count": failed_count,
         "duplicate_count": duplicate_count,
         "ready_jobs": ready_jobs,
+        "review_jobs": review_jobs,
+        "review_count": len(review_jobs),
     }
 
 
@@ -615,7 +622,7 @@ def retry_failed_triage(limit: int = 200):
     """
     failed_jobs = queue_service.list_failed(limit=limit)
     results = []
-    counts = {"ready": 0, "discarded": 0, "failed": 0, "duplicate": 0}
+    counts = {"ready": 0, "review": 0, "discarded": 0, "failed": 0, "duplicate": 0}
 
     for job in failed_jobs:
         result = _triage_job_url(job["job_url"])
@@ -658,7 +665,7 @@ def queue_stats():
 def ready_for_review():
     """Read-only DB -> Sheet reconciliation feed.
 
-    Returns jobs already accepted by triage. This endpoint never scrapes,
+    Returns accepted jobs and jobs needing factual filter review. This endpoint never scrapes,
     calls Gemini, or changes queue state.
     """
     jobs = queue_service.list_ready_for_review()
@@ -667,6 +674,7 @@ def ready_for_review():
         "jobs": [
             {
                 "job_url": job["job_url"],
+                "search_filter_decision": (job.get("baseline_comparison") or {}).get("decision", "KEEP"),
                 "company": job.get("company") or "",
                 "job_title": job.get("job_title") or "",
                 "language": job.get("language") or "",

@@ -40,6 +40,9 @@ REJECT = "REJECT"
 NEEDS_SEMANTIC = "NEEDS_SEMANTIC"
 
 _STRONG_REMOTE_PATTERNS = (
+    r"\b(?:trabajo|modalidad|puesto)\s+(?:en\s+)?remot[oa]\b",
+    r"\b100\s*%\s*remot[oa]\b",
+    r"\bteletrabajo\b",
     r"\bfully remote\b",
     r"\b100\s*%\s*remote\b",
     r"\bremote[- ]first\b",
@@ -52,6 +55,7 @@ _STRONG_REMOTE_PATTERNS = (
 )
 
 _HYBRID_OR_OFFICE_ATTENDANCE_PATTERNS = (
+    r"\bh[ií]brid[oa]\b",
     r"\bhybrid\b",
     r"\boffice[- ]first\b",
     r"\bflexible hybrid\b",
@@ -72,6 +76,7 @@ _HYBRID_OR_OFFICE_ATTENDANCE_PATTERNS = (
 )
 
 _ONSITE_PATTERNS = (
+    r"\bpresencial\b",
     r"\bon[- ]site\b",
     r"\bonsite\b",
     r"\bon site\b",
@@ -211,12 +216,14 @@ def classify_remote(job_text: str, work_format: str = "Unknown") -> str:
     """
     text = _norm(job_text)
     normalized = (work_format or "").strip().lower()
-    if normalized == "hybrid":
+    if normalized in ("hybrid", "híbrido", "hibrido", "híbrida", "hibrida"):
         return HYBRID
-    if normalized in ("on-site", "onsite", "on site"):
+    if normalized in ("on-site", "onsite", "on site", "presencial"):
         return ONSITE
-    if normalized in ("remote", "fully remote"):
+    if normalized in ("remote", "fully remote", "remoto", "remota"):
         mandatory_office = (
+            r"\bmodalidad\s+(?:100\s*%\s*)?presencial\b",
+            r"\bpresencial de lunes a viernes\b",
             r"\b\d+\s*days? (?:per|a) week (?:in|at) (?:the )?office\b",
             r"\b\d+\s*days? (?:per|a) month (?:in|at) (?:the )?office\b",
             r"\b(?:weekly|monthly|regular) office attendance\b",
@@ -224,6 +231,8 @@ def classify_remote(job_text: str, work_format: str = "Unknown") -> str:
             r"\b(?:required|expected) to (?:work|be|come) (?:in|at) (?:the )?office\b",
             r"\bmust (?:work|be|come) (?:in|at) (?:the )?office\b",
         )
+        if re.search(r"\bmodalidad\s+(?:100\s*%\s*)?presencial\b|\bpresencial de lunes a viernes\b", text):
+            return ONSITE
         return HYBRID if _matches_any(text, mandatory_office) else FULLY_REMOTE
 
     # Description-based fallback if LinkedIn did not expose the badge.
@@ -403,3 +412,18 @@ def evaluate_upgrade(
             "salary_source": "not_evaluated",
         },
     )
+
+
+def evaluate_search_filters(**kwargs):
+    """Apply the current policy; unrestricted mode is an explicit legacy opt-out."""
+    evidence = kwargs.pop("evidence", None)
+    if os.environ.get("SEARCH_POLICY", "christian").strip().lower() == "unrestricted":
+        return evaluate_upgrade(**kwargs)
+    from search_filters import evaluate
+    decision = evaluate(**kwargs, evidence=evidence)
+    # Preserve additional exclusions only when explicitly configured.
+    optional = evaluate_upgrade(**kwargs)
+    if not optional.keep:
+        from search_filters import SearchDecision, REJECT
+        return SearchDecision(REJECT, [optional.rejected_reason], decision.facts)
+    return decision
