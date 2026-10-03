@@ -45,12 +45,14 @@ class CVLayoutFitTests(unittest.TestCase):
 
         fitted = gemini_service._fit_adaptation_to_layout(adaptation)
 
-        self.assertGreaterEqual(len(fitted.nuevo_perfil), 555)
-        self.assertLessEqual(len(fitted.nuevo_perfil), 635)
-        self.assertEqual(len(fitted.nuevas_tareas), 4)
-        total_tasks = sum(len(task) for task in fitted.nuevas_tareas)
-        self.assertGreaterEqual(total_tasks, 700)
-        self.assertLessEqual(total_tasks, 800)
+        # Layout helpers must leave complete prose intact so the targeted
+        # Gemini repair can rewrite it, rather than silently cutting sentences.
+        self.assertEqual(fitted.nuevo_perfil, profile)
+        self.assertEqual(fitted.nuevas_tareas, tasks)
+        problems = gemini_service._validate_adaptation(fitted)
+        self.assertTrue(any("nuevo_perfil" in p for p in problems))
+        self.assertTrue(any("bullet" in p for p in problems))
+
 
 
 if __name__ == "__main__":

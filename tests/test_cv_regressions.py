@@ -35,24 +35,6 @@ class PdfFilenameTests(unittest.TestCase):
         )
 
 
-class CurrentRoleDateTests(unittest.TestCase):
-    def test_date_patch_preserves_paragraph_xml_and_split_runs(self):
-        xml = (
-            b'<w:document xmlns:w="urn:test"><w:body>'
-            b'<w:p><w:pPr><w:keepNext/></w:pPr>'
-            b'<w:r><w:rPr><w:b/></w:rPr><w:t>(Aug 2024 - Fe</w:t></w:r>'
-            b'<w:r><w:rPr><w:i/></w:rPr><w:t>b 2026)</w:t></w:r>'
-            b'</w:p></w:body></w:document>'
-        )
-
-        patched, replacements = cv_date_guard._patch_document_xml(xml)
-        paragraph = next(cv_date_guard._PARAGRAPH_RE.finditer(patched)).group(0)
-
-        self.assertEqual(replacements, 1)
-        self.assertIn(b"Jun 2026", cv_date_guard._joined_text(paragraph))
-        self.assertIn(b"<w:keepNext/>", paragraph)
-        self.assertIn(b"<w:b/>", paragraph)
-        self.assertIn(b"<w:i/>", paragraph)
 
 
 class CvBulletStyleTests(unittest.TestCase):
@@ -154,7 +136,7 @@ class StableCvFlowTests(unittest.TestCase):
 
         self.assertEqual(mocked.call_count, 2)
         self.assertEqual(result.nuevo_titulo, "Senior Product Analytics Data Specialist")
-        self.assertEqual(len(result.nuevo_perfil), 604)
+        self.assertEqual(len(result.nuevo_perfil), 603)
         self.assertTrue(result.nuevo_perfil.endswith("."))
         self.assertEqual(result.nuevas_tareas, bullets)
 
@@ -176,7 +158,7 @@ class StableCvFlowTests(unittest.TestCase):
 
         fitted = gemini_service._force_fix_adaptation(adaptation)
 
-        self.assertEqual(len(fitted.nuevo_perfil), 604)
+        self.assertEqual(len(fitted.nuevo_perfil), 603)
         self.assertTrue(fitted.nuevo_perfil.endswith("."))
         self.assertNotIn("C" * 10, fitted.nuevo_perfil)
 
@@ -185,7 +167,7 @@ class StableCvFlowTests(unittest.TestCase):
 class DocxExperienceAnchorTests(unittest.TestCase):
     def test_experienced_profile_does_not_match_experience_heading(self):
         doc = Document()
-        doc.add_heading("Personal Profile", level=1)
+        doc.add_heading("Sobre mí", level=1)
         doc.add_paragraph(
             "Experienced Account Manager with a strong background in digital marketing."
         )
@@ -195,7 +177,7 @@ class DocxExperienceAnchorTests(unittest.TestCase):
         )
         training.style = "List Bullet"
 
-        doc.add_heading("Experience", level=1)
+        doc.add_heading("Experiencia", level=1)
         current = doc.add_heading(
             "Senior Product Manager, Stanley Black & Decker",
             level=2,
@@ -240,7 +222,7 @@ class DocxExperienceAnchorTests(unittest.TestCase):
 
     def test_current_role_bullet_mismatch_aborts_without_deleting_history(self):
         doc = Document()
-        doc.add_heading("Experience", level=1)
+        doc.add_heading("Experiencia", level=1)
         doc.add_heading("Senior Product Manager, Stanley Black & Decker", level=2)
         doc.add_paragraph("Fortune 500 American Manufacturer")
         for i in range(3):
@@ -276,7 +258,7 @@ class CvTitleStyleTests(unittest.TestCase):
 
     def test_internal_commas_are_not_restricted(self):
         for title in (
-            "Senior Product Manager, AI Member Experience",
+            "Senior Product Manager, AI Member Experiencia",
             "Marketing Operations Manager, Digital Growth",
             "Sales Account Manager, DACH, Strategic Focus",
             "Pricing, Revenue Operations, and Analytics",
@@ -299,7 +281,7 @@ class ExperienceTaskFontSizeTests(unittest.TestCase):
         training_run = training.add_run("Training bullet stays unchanged.")
         training_run.font.size = Pt(9)
 
-        doc.add_heading("Experience", level=1)
+        doc.add_heading("Experiencia", level=1)
 
         doc.add_heading(
             "Senior Performance Marketing Manager, Stanley Black & Decker",

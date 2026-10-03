@@ -9,7 +9,7 @@ Por qué "anclas" y no {{PLACEHOLDERS}}:
   En cambio, este módulo detecta el contenido real como ancla:
     - "Christian | <TÍTULO>"           -> reemplaza <TÍTULO>
     - Heading "Personal Profile" -> siguiente párrafo -> reemplaza TODO
-    - Primer heading que contiene "Stanley Black & Decker" después de
+    - Primer heading que contiene "la empresa del CV maestro" después de
       "Experience" -> es el ROL ACTUAL -> reemplaza solo el cargo (antes de la coma)
     - Los bullets inmediatamente debajo de ese heading (hasta el próximo
       heading) -> reemplaza por las nuevas tareas de Gemini
@@ -62,9 +62,9 @@ MAX_BULLET_TOTAL_LINES = 8
 MIN_BULLET_TOTAL_CHARS = 700  # ~7 líneas completas -> por debajo de esto,
                                # probablemente no llena las 8 líneas exigidas.
 
-COMPANY_ANCHOR = "Stanley Black & Decker"
-PROFILE_HEADING = "Personal Profile"
-EXPERIENCE_HEADING = "Experience"
+COMPANY_ANCHOR = ""
+PROFILE_HEADING = "Sobre mí"
+EXPERIENCE_HEADING = "Experiencia"
 NAME_ANCHOR = "Christian"
 
 
@@ -145,6 +145,16 @@ def _delete_paragraph(paragraph: Paragraph) -> None:
     element.getparent().remove(element)
 
 
+def _is_separator(paragraph: Paragraph) -> bool:
+    return bool(paragraph.text.strip()) and set(paragraph.text.strip()) <= {"_"}
+
+
+def _is_bullet(paragraph: Paragraph) -> bool:
+    return paragraph.style.name.lower().startswith("list") or bool(
+        paragraph._p.xpath("./w:pPr/w:numPr")
+    )
+
+
 def _is_heading(paragraph: Paragraph) -> bool:
     return paragraph.style.name.lower().startswith("heading")
 
@@ -173,7 +183,7 @@ MIN_TITLE_CHARS = 39   # por debajo de esto, "Christian | <título>" cabe
 # Same calibrated visual guard used by gemini_service.py. ReportLab's
 # Helvetica metrics are close enough to Arial to reproduce the actual Word
 # wrap seen in the generated PDFs, unlike raw character counts.
-_TITLE_LAYOUT_PREFIX = "Christian | "
+_TITLE_LAYOUT_PREFIX = "Christian Molina | "
 _TITLE_FONT_NAME = "Helvetica-Bold"
 _TITLE_FONT_SIZE_PT = 15.96
 _TITLE_LINE_WIDTH_PT = 278.0
@@ -341,7 +351,7 @@ def update_profile(doc: Document, nuevo_perfil: str) -> None:
         )
     # El párrafo del perfil es el primer párrafo NO VACÍO después del heading
     for i in range(heading_idx + 1, len(doc.paragraphs)):
-        if doc.paragraphs[i].text.strip():
+        if doc.paragraphs[i].text.strip() and not _is_separator(doc.paragraphs[i]):
             _set_paragraph_text(doc.paragraphs[i], perfil_final)
             return
     raise ValueError("No encontré el párrafo del perfil debajo del heading.")
@@ -377,7 +387,7 @@ def _find_current_role_heading_index(doc: Document) -> int:
         p = doc.paragraphs[i]
         # The current role itself must be a heading. Never accept a Training
         # bullet or any other paragraph that merely mentions the company.
-        if COMPANY_ANCHOR in p.text and _is_heading(p):
+        if _is_heading(p) and "," in p.text and (not COMPANY_ANCHOR or COMPANY_ANCHOR in p.text):
             return i
 
     raise ValueError(
@@ -397,7 +407,7 @@ def update_current_role_title(doc: Document, nuevo_cargo_actual: str) -> int:
     # Todo lo que va DESPUÉS de la primera coma (empresa) queda 100% intacto
     _, _, resto = full_text.partition(",")
     # Defensa: si Gemini metió la empresa dentro de nuevo_cargo_actual
-    # (ej. "Senior Manager, Stanley Black & Decker"), usar solo lo que va
+    # (ej. "Senior Manager, la empresa del CV maestro"), usar solo lo que va
     # ANTES de su propia primera coma -> evita duplicar la empresa al
     # pegarle "resto" (que ya trae la empresa real después).
     cargo_limpio = nuevo_cargo_actual.split(",")[0].strip()
@@ -468,9 +478,9 @@ def update_current_role_bullets(doc: Document, role_heading_idx: int, nuevas_tar
         raise ValueError("Índice del rol actual inválido.")
 
     role_paragraph = doc.paragraphs[role_heading_idx]
-    if not _is_heading(role_paragraph) or COMPANY_ANCHOR not in role_paragraph.text:
+    if not _is_heading(role_paragraph) or "," not in role_paragraph.text or (COMPANY_ANCHOR and COMPANY_ANCHOR not in role_paragraph.text):
         raise ValueError(
-            "El ancla del rol actual no es un heading válido de Stanley Black & Decker. "
+            "El ancla del rol actual no es un heading válido de la empresa del CV maestro. "
             "Se aborta antes de tocar bullets."
         )
 
@@ -515,7 +525,7 @@ def update_current_role_bullets(doc: Document, role_heading_idx: int, nuevas_tar
         if _is_heading(p) and p.style.name == role_level:
             break
 
-        if p.text.strip() and p.style.name.lower().startswith("list"):
+        if p.text.strip() and _is_bullet(p):
             bullet_indices.append(i)
 
     if len(bullet_indices) != 4:
@@ -661,7 +671,7 @@ def _normalize_experience_task_font_sizes(
 
         if not paragraph.text.strip():
             continue
-        if not paragraph.style.name.lower().startswith("list"):
+        if not _is_bullet(paragraph):
             continue
 
         for run in paragraph.runs:
@@ -688,9 +698,7 @@ def apply_cv_adaptation(input_path: str, output_path: str, adaptation: dict) -> 
     update_profile(doc, adaptation["nuevo_perfil"])
     role_idx = update_current_role_title(doc, adaptation["nuevo_cargo_actual"])
     update_current_role_bullets(doc, role_idx, adaptation["nuevas_tareas"])
-    _normalize_sections_for_libreoffice(doc)
-    _normalize_fonts(doc)
-    _normalize_experience_task_font_sizes(doc)
+    # Preserve the source CV fonts, section settings and historical formatting.
 
     doc.save(output_path)
     return output_path
