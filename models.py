@@ -104,6 +104,30 @@ class JobQuestion(BaseModel):
 # 3. Salida de Gemini (extracción de la oferta) — dinámica, N preguntas
 # ---------------------------------------------------------------------------
 
+class BooleanSearchEvidence(BaseModel):
+    value: Literal["YES", "NO", "UNKNOWN"] = "UNKNOWN"
+    evidence: str = ""
+
+
+class CompanySizeEvidence(BaseModel):
+    value: Literal["MEDIUM_OR_LARGE", "SMALL", "UNKNOWN"] = "UNKNOWN"
+    evidence: str = ""
+
+
+class ExperienceSearchEvidence(BaseModel):
+    minimum_years: Optional[float] = Field(default=None, ge=0, le=80)
+    strictly_more: bool = False
+    evidence: str = ""
+
+
+class SearchFilterEvidence(BaseModel):
+    mining: BooleanSearchEvidence = Field(default_factory=BooleanSearchEvidence)
+    company_size: CompanySizeEvidence = Field(default_factory=CompanySizeEvidence)
+    multinational: BooleanSearchEvidence = Field(default_factory=BooleanSearchEvidence)
+    internship: BooleanSearchEvidence = Field(default_factory=BooleanSearchEvidence)
+    experience: ExperienceSearchEvidence = Field(default_factory=ExperienceSearchEvidence)
+
+
 class JobExtraction(BaseModel):
     company: str
     job_title: str
@@ -115,6 +139,7 @@ class JobExtraction(BaseModel):
     # LinkedIn mezclado (chrome de la página en alemán + oferta en inglés).
     detected_language: Literal["EN", "DE", "OTHER"] = "OTHER"
     questions: List[JobQuestion] = Field(default_factory=list)
+    search_filter_evidence: SearchFilterEvidence = Field(default_factory=SearchFilterEvidence)
 
     @field_validator("questions")
     @classmethod

@@ -283,7 +283,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { row: {\"Link\": ($json.job_url), \"Status\": (\"NEW\"), \"company\": ($json.company), \"job_title\": ($json.job_title), \"added_at\": ($now.toISO()), \"description\": ($json.description), \"Format\": ($json.work_format || ''), \"Salary\": ($json.salary_range || '')}, matching_columns: [\"Link\"], preserve_existing: true } }}"
+        "jsonBody": "={{ { row: {\"Link\": ($json.job_url), \"Status\": ($json.search_filter_decision === 'REVIEW' ? 'FILTER_REVIEW' : 'NEW'), \"company\": ($json.company), \"job_title\": ($json.job_title), \"added_at\": ($now.toISO()), \"description\": ($json.description), \"Format\": ($json.work_format || ''), \"Salary\": ($json.salary_range || ''), \"reason\": ($json.upgrade_reason || ''), \"Revisar\": ($json.search_filter_decision === 'REVIEW' ? 'Verificar filtros: ' + ($json.upgrade_reason || 'datos faltantes') : '')}, matching_columns: [\"Link\"], preserve_existing: true } }}"
       },
       "id": "04588fb1-bc76-46f0-b590-c23f79937723",
       "name": "Guardar ofertas nuevas en Excel",
@@ -760,7 +760,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const jobs = Array.isArray($json.ready_jobs) ? $json.ready_jobs : [];\nreturn jobs.map(job => ({ json: job }));"
+        "jsCode": "const ready = Array.isArray($json.ready_jobs) ? $json.ready_jobs : [];\nconst review = Array.isArray($json.review_jobs) ? $json.review_jobs : [];\nreturn [...ready, ...review].map(job => ({ json: job }));"
       },
       "id": "aae3178f-1eb7-4d09-9ea6-b1172d7e7545",
       "name": "Split ready_jobs (backend triage)",

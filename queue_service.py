@@ -128,7 +128,7 @@ def enqueue_triage_urls(urls: list[str]) -> dict:
     """Persist newly discovered URLs specifically for triage.
 
     Uses triage_pending instead of pending so /process-next (the application/PDF
-    queue) can never claim a job that has not passed language/German triage yet.
+    queue) can never claim a job that has not passed the search filters yet.
     Existing URLs are never modified.
     """
     inserted = 0
@@ -151,7 +151,7 @@ def enqueue_triage_urls(urls: list[str]) -> dict:
 
 
 def list_ready_for_review() -> list[dict]:
-    """Return already-triaged jobs for DB -> Sheet reconciliation.
+    """Return accepted and filter-review jobs for DB -> Excel reconciliation.
 
     Read-only: no scraping, Gemini calls, or status changes.
     """
@@ -161,13 +161,13 @@ def list_ready_for_review() -> list[dict]:
         cur.execute(
             """
             SELECT
-                job_url, company, job_title, language, job_text, work_format,
+                job_url, status, company, job_title, language, job_text, work_format,
                 baseline_level, upgrade_reason, rejected_reason,
                 baseline_comparison, candidate_fit_decision,
                 candidate_fit_level, candidate_fit_reason,
                 last_error, updated_at
             FROM job_queue
-            WHERE status = 'ready_for_review'
+            WHERE status IN ('ready_for_review', 'filter_review')
             ORDER BY updated_at ASC
             """
         )
