@@ -1,0 +1,53 @@
+{
+  "name": "Maintenance - Retry Failed Triage",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2dd853aa-1e11-4f46-a22c-001-retryfailed",
+      "name": "Manual Trigger - Retry Failed",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/retry-failed-triage?limit=1000",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "2dd853aa-1e11-4f46-a22c-002-retryfailed",
+      "name": "Retry Failed Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -80,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger - Retry Failed": {
+      "main": [
+        [
+          {
+            "node": "Retry Failed Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

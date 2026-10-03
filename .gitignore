@@ -1,0 +1,20 @@
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+.env
+work/
+maintenance_backups/
+
+# Local credentials and environment backups
+.env.*
+!.env.example
+
+node_modules/
+output_pdfs/
+cv_maestro_cache.txt
+linkedin_search_state.json
+*.docx
+*.pdf
+*.save

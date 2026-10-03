@@ -1,0 +1,401 @@
+{
+  "name": "Job Application Bot - PDF + Autofill Separados",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7f81a4d7-3b1c-4f96-9f19-7f75db3c2f10",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "job-application-separated",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "56f54d93-c1e6-46d0-a7c5-0530847d5702",
+      "name": "Webhook - New Application",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        160
+      ],
+      "webhookId": "job-application-separated"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d13cb3b-8096-4c13-b4be-2b6cc567cf9d",
+              "name": "backend_base_url",
+              "value": "http://host.docker.internal:8000",
+              "type": "string"
+            },
+            {
+              "id": "5c1f6b8e-76d6-4aef-9260-40f889f4f30a",
+              "name": "url",
+              "value": "https://job-boards.greenhouse.io/planetlabs/jobs/7993116?gh_src=e56b92851us",
+              "type": "string"
+            },
+            {
+              "id": "fd10ce08-df20-4d46-a3ef-9489d99c3876",
+              "name": "job_text",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "401bf2c2-9c08-4e64-aa65-0170416a48c6",
+              "name": "from_sheet",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2fa82d3-38bd-4afb-81ce-7c2191a78d5a",
+      "name": "Set Test Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -620,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d95f41d5-b995-4989-8ab3-5f4e8761698d",
+              "name": "backend_base_url",
+              "value": "={{ ($json.body && $json.body.backend_base_url) || $json.backend_base_url || 'http://host.docker.internal:8000' }}",
+              "type": "string"
+            },
+            {
+              "id": "fbd11541-3eb6-4484-a04f-1fa236879910",
+              "name": "url",
+              "value": "={{ ($json.body && ($json.body.url || $json.body.source_url)) || $json.url || $json.source_url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bc8f7f08-9857-4f03-a418-65a40afc0e24",
+              "name": "job_text",
+              "value": "={{ ($json.body && ($json.body.job_text || $json.body.description)) || $json.job_text || $json.description || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "08cc3eb2-8d27-4878-a811-d97d7f332f3b",
+              "name": "from_sheet",
+              "value": "={{ ($json.body && $json.body.from_sheet !== undefined) ? $json.body.from_sheet : true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "08466f79-390d-4940-80fc-1826a6b64f9b",
+      "name": "Normalize Webhook Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -620,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.backend_base_url + '/create-application-pdf' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.url, job_text: $json.job_text || '', from_sheet: $json.from_sheet !== false } }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "778c7e7e-c069-4c4f-94be-c884688d65e8",
+      "name": "1 - Create PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -340,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f4e024e3-7a78-482e-b6ac-9b14641ced8a",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "pdf_ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6b63c9c8-d3ce-4ed8-a2fb-1138dc683a4d",
+      "name": "PDF Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/autofill-application' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.source_url || $json.url, pdf_path: $json.pdf_path, application_id: $json.application_id, company: $json.company || '', job_title: $json.job_title || '', expected_salary: $json.expected_salary || null, responses: $json.responses || [], motivation_answer: $json.motivation_answer || '', experience_answer: $json.experience_answer || '', job_context: $json.job_context || '' } }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "d7e5fd47-47da-49b6-86f8-cf22df6d9ce5",
+      "name": "2 - Autofill Existing PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "65ea2a3d-55df-45be-88fb-38f97b37ef08",
+              "name": "status",
+              "value": "={{ $json.status || 'error' }}",
+              "type": "string"
+            },
+            {
+              "id": "b9c25a1a-cb2c-40b9-95a9-71d6c580a6a4",
+              "name": "application_id",
+              "value": "={{ $json.application_id || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "94f4eed1-1975-4659-b36f-86674840d01b",
+              "name": "company",
+              "value": "={{ $json.company || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "296adf16-37e2-4b24-8e85-4ed509b5f8dc",
+              "name": "job_title",
+              "value": "={{ $json.job_title || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "10f7f5e6-dc02-464d-8460-b2e37a69a0e4",
+              "name": "pdf_path",
+              "value": "={{ $json.pdf_path || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "11e0361d-4d33-46b8-8052-88f9cf321f73",
+              "name": "autofill_status",
+              "value": "={{ ($json.autofill && $json.autofill.status) || $json.status || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3930b934-f6a6-47e4-b4d2-223a9e8578f9",
+              "name": "screenshot",
+              "value": "={{ ($json.autofill && $json.autofill.screenshot) || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "eceb513a-6f07-4841-a686-15ce2c85985a",
+              "name": "detail",
+              "value": "={{ ($json.autofill && $json.autofill.detail) || $json.detail || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8aa46ed1-ef09-4829-a434-806f36d7ac61",
+      "name": "Final Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b75c87a6-a6ad-4fbc-b2cd-ffac4b97b3a3",
+              "name": "status",
+              "value": "={{ $json.status || 'not_pdf_ready' }}",
+              "type": "string"
+            },
+            {
+              "id": "dc2952fb-9d94-42cb-bb70-d865c7058a3d",
+              "name": "reason",
+              "value": "={{ $json.reason || $json.detail || 'PDF was not generated. Autofill skipped.' }}",
+              "type": "string"
+            },
+            {
+              "id": "f64623e1-c1bc-4926-a9fb-6e312c1fd940",
+              "name": "source_url",
+              "value": "={{ $json.source_url || $json.url || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "33431ccd-c413-43d4-84cc-ce6430cc7313",
+      "name": "PDF Failed or Discarded",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Flujo separado para evitar regenerar CV si falla autofill.\n\n1 - Create PDF llama /create-application-pdf.\n2 - Autofill Existing PDF llama /autofill-application usando el mismo pdf_path.\n\nSi n8n corre fuera de Docker, cambia backend_base_url a http://localhost:8000 en los nodos Set.",
+        "height": 220,
+        "width": 360
+      },
+      "id": "9a6468fd-9a33-4d0b-ae22-43ec66d4efc8",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        -440
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Test Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - New Application": {
+      "main": [
+        [
+          {
+            "node": "Normalize Webhook Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Test Input": {
+      "main": [
+        [
+          {
+            "node": "1 - Create PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Webhook Input": {
+      "main": [
+        [
+          {
+            "node": "1 - Create PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 - Create PDF": {
+      "main": [
+        [
+          {
+            "node": "PDF Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Ready?": {
+      "main": [
+        [
+          {
+            "node": "2 - Autofill Existing PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF Failed or Discarded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 - Autofill Existing PDF": {
+      "main": [
+        [
+          {
+            "node": "Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "df98941f-4007-4ae5-a29d-8516081e58a6",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "PDF_AUTOFILL_SEPARATED_WORKFLOW",
+  "tags": []
+}

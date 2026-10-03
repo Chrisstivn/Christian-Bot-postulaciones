@@ -1,0 +1,211 @@
+{
+  "name": "Maintenance - Recheck LinkedIn Applications",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "3ee964bb-2f22-4a57-b33d-001-checkjobs",
+      "name": "Manual Trigger - Recheck LinkedIn",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Postulaciones",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "3ee964bb-2f22-4a57-b33d-002-checkjobs",
+      "name": "Get Jobs from Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -480,
+        0
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => {\n  const status = String(item.json.Status || '').trim().toUpperCase();\n  const link = String(item.json.Link || '').trim();\n  return ['NEW', 'READY'].includes(status) && link.includes('linkedin.com/jobs/');\n});"
+      },
+      "id": "3ee964bb-2f22-4a57-b33d-003-checkjobs",
+      "name": "Only NEW or READY LinkedIn Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/check-linkedin-job-status",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.Link } }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "3ee964bb-2f22-4a57-b33d-004-checkjobs",
+      "name": "Check If Application Is Closed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "closed-status-condition",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "closed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ee964bb-2f22-4a57-b33d-005-checkjobs",
+      "name": "Only Closed",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
+        "sheetName": "Postulaciones",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Link": "={{ $json.url }}",
+            "Status": "CLOSED",
+            "reason": "={{ 'LinkedIn: ' + ($json.reason || 'no longer accepting applications') }}"
+          },
+          "matchingColumns": [
+            "Link"
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ee964bb-2f22-4a57-b33d-006-checkjobs",
+      "name": "Mark CLOSED in Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger - Recheck LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Get Jobs from Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Jobs from Sheet": {
+      "main": [
+        [
+          {
+            "node": "Only NEW or READY LinkedIn Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only NEW or READY LinkedIn Jobs": {
+      "main": [
+        [
+          {
+            "node": "Check If Application Is Closed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Application Is Closed": {
+      "main": [
+        [
+          {
+            "node": "Only Closed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Closed": {
+      "main": [
+        [
+          {
+            "node": "Mark CLOSED in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

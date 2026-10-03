@@ -1,0 +1,27 @@
+# Fill with the candidate's real details before generating applications.
+personal:
+  full_name: ""
+  first_name: ""
+  last_name: ""
+  location: ""
+  work_authorization: ""
+  citizenship: ""
+  availability: ""
+  email: ""
+  phone: ""
+  linkedin: ""
+languages:
+  spanish:
+    level: ""
+    notes: ""
+professional:
+  years_experience: 0
+  current_position: ""
+  current_company: ""
+preferences:
+  target_roles: []
+  target_seniority: []
+  target_industries: []
+skills:
+  core: []
+  tools: []

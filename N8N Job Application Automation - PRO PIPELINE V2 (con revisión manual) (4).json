@@ -1,0 +1,679 @@
+{
+  "name": "Job Application Automation - PRO PIPELINE V2 (con revisión manual)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "f90cdf9a-e570-4fe7-b08f-01539ad9bc34",
+      "name": "Schedule (Buscar en LinkedIn)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1552,
+        -2192
+      ],
+      "notes": "Corre automático cada 1 hora (cambia 'hoursInterval' si querés otro intervalo). Reemplaza al trigger manual -- ya no hace falta apretar 'Execute workflow' a mano."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "search_url_field",
+              "name": "search_url",
+              "value": "https://www.linkedin.com/jobs/search/?location=Chile",
+              "type": "string"
+            },
+            {
+              "id": "max_jobs_field",
+              "name": "max_jobs",
+              "value": 25,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6a63d5aa-cbc7-4f93-aca3-f0664fe7cc90",
+      "name": "Search Params1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1360,
+        -2192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/linkedin-search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { search_url: $json.search_url, max_jobs: $json.max_jobs } }}",
+        "options": {}
+      },
+      "id": "676d3b68-9646-4543-938e-35904d503cf8",
+      "name": "Call LinkedIn Search1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -1152,
+        -2192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const urls = $input.first().json.job_urls || [];\nreturn urls.map(u => ({ json: { url: u } }));"
+      },
+      "id": "cf1e9e12-9afa-4e73-b8d7-c529b9fa36a8",
+      "name": "Split URLs1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -2192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/triage-job",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.url } }}",
+        "options": {}
+      },
+      "id": "c1ae7f91-3261-4655-bc16-b06d47e96851",
+      "name": "Call /triage-job (dedup + idioma + alemán)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -752,
+        -2192
+      ],
+      "continueOnFail": true,
+      "notes": "Acá pasa la deduplicación contra Postgres, el filtro de idioma y el filtro de alemán obligatorio -- ANTES de que nada llegue al Sheet. Solo status='ready' sigue de largo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond_triage_ready",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "df2eb929-1a28-4f46-b2d5-0a7c1ad17ac2",
+      "name": "Filter: Solo status=ready1",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -2192
+      ],
+      "notes": "Las duplicadas, descartadas por idioma y descartadas por alemán mueren acá. NUNCA llegan al Sheet."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Postulaciones",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Link": "={{ $json.job_url }}",
+            "Status": "NEW",
+            "company": "={{ $json.company }}",
+            "job_title": "={{ $json.job_title }}",
+            "added_at": "={{ $now.toISO() }}",
+            "reason": "={{ ($json.baseline_level || '') + ' | ' + ($json.upgrade_reason || '') }}"
+          },
+          "schema": [
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "real_apply_url",
+              "displayName": "real_apply_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "added_at",
+              "displayName": "added_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pdf_name",
+              "displayName": "pdf_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "download_url",
+              "displayName": "download_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9ec56c33-4997-4c20-a645-8b8ec5e29bf5",
+      "name": "Save New URLs for Review1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -352,
+        -2192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "APPEND ONLY. Upstream guard guarantees Link does not already exist in Postulaciones. Never use appendOrUpdate here: it can downgrade READY/DONE/pdf_ready/easyapply_pdfready to NEW."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Postulaciones",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "04785e3e-50a0-4e37-9a4a-555c77c4f0d6",
+      "name": "Get Rows from Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1152,
+        -1696
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond_status_ready",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "READY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "32adaff3-a32c-471b-a6d3-765d0c09eebe",
+      "name": "Filter Ready1",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -1696
+      ],
+      "notes": "Solo pasan filas con Status=READY Y real_apply_url completado a mano. Así nunca se procesa un link de LinkedIn 'crudo' sin que vos hayas revisado primero."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/process-application",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.real_apply_url, job_text: \"\" } }}",
+        "options": {}
+      },
+      "id": "3a3e74cf-f0a1-4195-a821-ed63b977f1c7",
+      "name": "Call Backend (PRO)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -752,
+        -1696
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "83bce4c7-3211-44e0-aa93-3e9a0b5fe10d",
+      "name": "Switch Status1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -1696
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
+        "sheetName": "Postulaciones",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "real_apply_url": "={{ $('Filter Ready1').item.json.real_apply_url }}",
+            "Status": "DISCARDED",
+            "company": "={{ $json.company || '' }}",
+            "job_title": "={{ $json.job_title || '' }}",
+            "reason": "={{ $json.reason || '' }}"
+          },
+          "matchingColumns": [
+            "real_apply_url"
+          ]
+        },
+        "options": {}
+      },
+      "id": "e3eb90f7-29f1-4196-be61-f59033f8c447",
+      "name": "Save Discarded1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -352,
+        -1888
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": "1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE",
+        "sheetName": "Postulaciones",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "real_apply_url": "={{ $('Filter Ready1').item.json.real_apply_url }}",
+            "Status": "DONE",
+            "ID": "={{ $json.ID }}",
+            "company": "={{ $json.company }}",
+            "job_title": "={{ $json.job_title }}",
+            "pdf_name": "={{ $json.pdf_name }}",
+            "download_url": "={{ $json.download_url }}"
+          },
+          "matchingColumns": [
+            "real_apply_url"
+          ]
+        },
+        "options": {}
+      },
+      "id": "4faf98f8-9910-42bb-8744-8255546055a1",
+      "name": "Save Success1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -352,
+        -1488
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1tLUXUZWBMtu3WMU5hHZxEtYpVWaA8xLczGBP0qyN4GE/edit?gid=0#gid=0",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Postulaciones",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "5d3aeb2e-5a8c-4fb8-8b94-0e3a8ef7e101",
+      "name": "Snapshot Existing Sheet Links1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1456,
+        -2192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "Peq26MAhpPCTvMSf",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Read-only snapshot before LinkedIn search. Existing Sheet Links are terminal for discovery: they must never be rewritten to NEW."
+    },
+    {
+      "parameters": {
+        "jsCode": "function canon(value) {\n  const raw = String(value || '').trim();\n  if (!raw) return '';\n  try {\n    const u = new URL(raw);\n    u.hash = '';\n    u.search = '';\n    const path = u.pathname.replace(/\\/+$/, '');\n    return (u.origin + path).toLowerCase();\n  } catch {\n    return raw.replace(/[?#].*$/, '').replace(/\\/+$/, '').toLowerCase();\n  }\n}\n\nconst existing = new Set();\nfor (const item of $input.all()) {\n  for (const value of [item.json.Link, item.json.real_apply_url]) {\n    const normalized = canon(value);\n    if (normalized) existing.add(normalized);\n  }\n}\nreturn [{ json: { existing_links: [...existing] } }];"
+      },
+      "id": "4c646d0b-446a-4bc9-a6ce-3cc48df1a102",
+      "name": "Build Existing Link Set1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1264,
+        -2192
+      ],
+      "notes": "Collapse the Sheet snapshot to one item so Search Params runs once, while preserving every existing Link for the downstream guard."
+    },
+    {
+      "parameters": {
+        "jsCode": "function canon(value) {\n  const raw = String(value || '').trim();\n  if (!raw) return '';\n  try {\n    const u = new URL(raw);\n    u.hash = '';\n    u.search = '';\n    const path = u.pathname.replace(/\\/+$/, '');\n    return (u.origin + path).toLowerCase();\n  } catch {\n    return raw.replace(/[?#].*$/, '').replace(/\\/+$/, '').toLowerCase();\n  }\n}\n\nconst existing = new Set(\n  ($(\"Build Existing Link Set1\").first().json.existing_links || [])\n    .map(canon)\n    .filter(Boolean)\n);\n\nreturn $input.all().filter(item => {\n  const link = canon(item.json.url || item.json.job_url || item.json.Link);\n  return link && !existing.has(link);\n});"
+      },
+      "id": "0f7b799d-a0f8-472a-9297-8a4bdbd1a103",
+      "name": "Only URLs Not Already in Sheet1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -2192
+      ],
+      "notes": "Hard Sheet-level dedup. Even if Postgres is stale/reset, a Link already present in Postulaciones never reaches triage and can never be downgraded."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule (Buscar en LinkedIn)": {
+      "main": [
+        [
+          {
+            "node": "Snapshot Existing Sheet Links1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Params1": {
+      "main": [
+        [
+          {
+            "node": "Call LinkedIn Search1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call LinkedIn Search1": {
+      "main": [
+        [
+          {
+            "node": "Split URLs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split URLs1": {
+      "main": [
+        [
+          {
+            "node": "Only URLs Not Already in Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call /triage-job (dedup + idioma + alemán)1": {
+      "main": [
+        [
+          {
+            "node": "Filter: Solo status=ready1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Solo status=ready1": {
+      "main": [
+        [
+          {
+            "node": "Save New URLs for Review1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rows from Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Filter Ready1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Ready1": {
+      "main": [
+        [
+          {
+            "node": "Call Backend (PRO)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Backend (PRO)1": {
+      "main": [
+        [
+          {
+            "node": "Switch Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Status1": {
+      "main": [
+        [
+          {
+            "node": "Save Discarded1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Snapshot Existing Sheet Links1": {
+      "main": [
+        [
+          {
+            "node": "Build Existing Link Set1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Existing Link Set1": {
+      "main": [
+        [
+          {
+            "node": "Search Params1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only URLs Not Already in Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Call /triage-job (dedup + idioma + alemán)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "32305150-f4a8-413c-9f7d-f315b1ad2ca5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c6b0d9d608ce1239cbf418d9474913cacbd26f5a8a3ca3be0f065f8bc5ce462"
+  },
+  "nodeGroups": [],
+  "id": "BvlvOT88XMYdEraL",
+  "tags": []
+}
+

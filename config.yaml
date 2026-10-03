@@ -1,0 +1,23 @@
+confidence:
+  auto_fill_threshold: 0.85
+  fill_log_threshold: 0.60
+  skip_threshold: 0.60
+retries:
+  max_retries: 8
+  field_retries: 3
+  recovery_retries: 2
+ats_memory:
+  enabled: true
+  path: work/ats_memory.json
+metrics:
+  enabled: true
+  path: work/metrics.jsonl
+logging:
+  enabled: true
+  path: work/application_logs.jsonl
+screenshots:
+  dir: work/screenshots
+manual_intervention:
+  timeout_seconds: 900
+questions:
+  use_contextual_classification: true

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "playwright": "^1.61.1",
+    "playwright-stealth": "^0.0.1"
+  }
+}

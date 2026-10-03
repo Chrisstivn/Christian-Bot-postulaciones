@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # Tu base de datos original
+  postgres:
+    image: postgres:16
+    container_name: job_queue_db
+    restart: always
+    environment:
+      POSTGRES_USER: jobbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: jobqueue
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Tu nuevo bot
+  mi_bot:
+    build: .
+    container_name: bot_con_interfaz
+    ports:
+      - "5900:5900"
+    volumes:
+      - .:/app
+
+volumes:
+  pgdata:
