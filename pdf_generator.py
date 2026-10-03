@@ -57,6 +57,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 OUTPUT_DIR = Path("output_pdfs")
@@ -132,17 +133,52 @@ def docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> None:
         )
 
 
+def _prepare_libreoffice_cv(docx_path: str, output_path: Path) -> None:
+    """Make Word's compact Spanish CV line heights explicit for LibreOffice.
+
+    LibreOffice expands automatic lines using fallback/empty-run metrics,
+    overflowing Experience before the template's next-page section break.
+    Only the conversion copy is changed; text, fonts and section breaks stay.
+    """
+    from docx import Document
+    from docx.enum.text import WD_LINE_SPACING
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    doc = Document(docx_path)
+    headings = {p.text.strip() for p in doc.paragraphs}
+    if {'Sobre mí', 'Experiencia', 'Habilidades'} <= headings:
+        for paragraph in doc.paragraphs:
+            if paragraph.style.name.lower().startswith('heading') or paragraph.style.name == 'Title':
+                continue
+            if paragraph.paragraph_format.line_spacing_rule in (WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST):
+                continue
+            sizes = paragraph._p.xpath('./w:pPr/w:rPr/w:sz')
+            if sizes:
+                size = int(sizes[0].get(qn('w:val'))) / 2
+            else:
+                run_sizes = [r.font.size.pt for r in paragraph.runs if r.text and r.font.size]
+                size = run_sizes[0] if run_sizes else 11
+            paragraph.paragraph_format.line_spacing = Pt(size * 1.15)
+    doc.save(output_path)
+
+
 def docx_to_pdf_via_libreoffice(docx_path: str, out_dir: Path) -> Path:
     """Fallback opcional (PDF_ENGINE=libreoffice) para cuando esto corre en
     un Linux sin Windows/Word disponible (ej. servidor de producción)."""
-    subprocess.run(
-        [
-            "soffice", "--headless", "--convert-to", "pdf",
-            "--outdir", str(out_dir), docx_path,
-        ],
-        check=True,
-        timeout=60,
-    )
+    out_dir = out_dir.resolve()
+    with tempfile.TemporaryDirectory() as temp:
+        conversion_copy = Path(temp) / Path(docx_path).name
+        _prepare_libreoffice_cv(docx_path, conversion_copy)
+        subprocess.run(
+            [
+                "soffice", f"-env:UserInstallation={(Path(temp) / 'profile').as_uri()}",
+                "--headless", "--convert-to", "pdf",
+                "--outdir", str(out_dir), str(conversion_copy),
+            ],
+            check=True,
+            timeout=60,
+        )
     pdf_path = out_dir / (Path(docx_path).stem + ".pdf")
     if not pdf_path.exists():
         raise RuntimeError(f"LibreOffice no generó el PDF esperado en {pdf_path}")
@@ -159,7 +195,6 @@ def build_final_pdf(
     final_path = OUTPUT_DIR / pdf_name
 
     if PDF_ENGINE == "libreoffice":
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             cv_pdf = docx_to_pdf_via_libreoffice(adapted_docx_path, Path(tmp))
             shutil.copyfile(cv_pdf, final_path)

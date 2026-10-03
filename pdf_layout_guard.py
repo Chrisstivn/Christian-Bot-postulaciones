@@ -31,13 +31,19 @@ def _find_lines(document, target):
     return matches
 
 
-def validate_pdf_layout(path, adaptation, full_name):
+def validate_pdf_layout(path, adaptation, full_name, expected_pages=None):
     """Return field-specific problems. Unreadable/missing generated text fails closed."""
     problems=[]
     fields=[('nuevo_titulo',full_name+' | '+adaptation.nuevo_titulo,2,2),
             ('nuevo_perfil',adaptation.nuevo_perfil,6,6)]
     fields += [('nuevas_tareas',task,1,2) for task in adaptation.nuevas_tareas]
     with fitz.open(path) as document:
+        if expected_pages is not None:
+            if len(document) != expected_pages:
+                problems.append({'field':'pagination','reason':'page_count',
+                                 'pages':len(document),'expected':expected_pages})
+            elif not document[1].get_text().lstrip().startswith('Habilidades'):
+                problems.append({'field':'pagination','reason':'experience_overflows_first_page'})
         for field,target,minimum,maximum in fields:
             matches=_find_lines(document,target)
             if len(matches)!=1:

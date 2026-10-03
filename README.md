@@ -118,8 +118,11 @@ Además de los límites de caracteres, el PDF convertido se comprueba con
 sus líneas reales: encabezado de dos líneas, perfil de seis y máximo dos
 por tarea. Si falla, Gemini recibe una única reparación dirigida con el CV
 maestro; se convierte de nuevo y se comprueba. Si persiste, responde 422 y
-no entrega el PDF como listo. Esto no sustituye la revisión visual final. El documento
-maestro actual ocupa tres páginas; esta actualización no rediseña su paginación.
+no entrega el PDF como listo. La plantilla debe ocupar dos páginas y la segunda
+debe empezar con Habilidades; se bloquea cualquier desbordamiento de Experiencia.
+Esto no sustituye la revisión visual final. En LibreOffice se explicita el alto
+de línea en una copia temporal para evitar que sus métricas automáticas creen
+una tercera página. El Word maestro, sus fuentes y sus saltos de sección se conservan.
 
 ### Verificación local
 

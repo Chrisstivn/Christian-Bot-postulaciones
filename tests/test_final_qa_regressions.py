@@ -1,5 +1,6 @@
 """Reproduce failures found while validating the generated PDFs and live scraping."""
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from docx import Document
@@ -98,6 +99,56 @@ class RenderedLayoutGuardTests(unittest.TestCase):
             a.nuevo_perfil='Text that was not rendered in the PDF.'
             self.assertTrue(any(p['reason']=='generated_text_missing_or_duplicated'
                                 for p in validate_pdf_layout(file,a,'Sample Candidate')))
+
+    def test_extra_page_is_rejected_even_if_adapted_fields_fit(self):
+        import fitz
+        from pdf_layout_guard import validate_pdf_layout
+        with tempfile.TemporaryDirectory() as folder:
+            file,a=self.create_pdf(folder,6)
+            with fitz.open(file) as doc:
+                doc.new_page().insert_text((70,70),'Historical experience overflow')
+                doc.new_page().insert_text((70,70),'Habilidades')
+                doc.saveIncr()
+            self.assertIn({'field':'pagination','reason':'page_count','pages':3,'expected':2},
+                          validate_pdf_layout(file,a,'Sample Candidate',expected_pages=2))
+
+    def test_experience_on_second_page_is_rejected(self):
+        import fitz
+        from pdf_layout_guard import validate_pdf_layout
+        with tempfile.TemporaryDirectory() as folder:
+            file,a=self.create_pdf(folder,6)
+            with fitz.open(file) as doc:
+                doc.new_page().insert_text((70,70),'Historical experience overflow\nHabilidades')
+                doc.saveIncr()
+            self.assertIn({'field':'pagination','reason':'experience_overflows_first_page'},
+                          validate_pdf_layout(file,a,'Sample Candidate',expected_pages=2))
+
+    @unittest.skipUnless(os.getenv('RUN_PDF_RENDER_TESTS') == '1', 'Opt in to real LibreOffice rendering with local CV/fonts')
+    def test_real_template_and_adaptation_keep_two_pages(self):
+        import fitz
+        import docx_adapter
+        from types import SimpleNamespace
+        from pdf_layout_guard import validate_pdf_layout
+        from test_christian_cv import ChristianCvTests, SOURCE
+        with tempfile.TemporaryDirectory() as folder:
+            adapted=Path(folder)/'adapted.docx'
+            a=ChristianCvTests().adaptation()
+            docx_adapter.apply_cv_adaptation(str(SOURCE),str(adapted),a.model_dump())
+            original_bytes=SOURCE.read_bytes()
+            for path in (SOURCE,adapted):
+                source=Document(path)
+                pdf=pdf_generator.docx_to_pdf_via_libreoffice(str(path),Path(folder))
+                fields=SimpleNamespace(nuevo_titulo=source.paragraphs[1].text.partition('|')[2].strip(),
+                    nuevo_perfil=source.paragraphs[9].text,
+                    nuevas_tareas=[source.paragraphs[i].text for i in (23,24,25,26)])
+                self.assertEqual(validate_pdf_layout(pdf,fields,
+                    source.paragraphs[1].text.partition('|')[0].strip(),expected_pages=2),[])
+                with fitz.open(pdf) as rendered:
+                    for paragraph in source.paragraphs[27:42]:
+                        if paragraph.text.strip():
+                            from pdf_layout_guard import _find_lines
+                            self.assertEqual(_find_lines(rendered,paragraph.text)[0][0],0)
+            self.assertEqual(SOURCE.read_bytes(),original_bytes)
 
 
 if __name__=='__main__':unittest.main()
