@@ -1,6 +1,8 @@
 """Local output workbook for Christian's n8n workflows (never committed)."""
 import fcntl
 import os
+import json
+from typing import Any
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -15,7 +17,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent
 HEADERS = ["Link", "Status", "real_apply_url", "company", "job_title", "added_at",
            "ID", "pdf_name", "download_url", "reason", "work_format",
-           "autofill_status", "screenshot"]
+           "autofill_status", "screenshot", "description", "Format", "Salary", "Revisar", "autofill"]
 router = APIRouter(prefix="/excel-output", tags=["Excel local"])
 
 
@@ -85,18 +87,23 @@ def _row(sheet, number, headers):
 
 
 class RowInput(BaseModel):
-    row: dict[str, str | int | float | bool | None]
+    row: dict[str, Any]
     matching_columns: list[str] = Field(default_factory=lambda: ["Link"])
     preserve_existing: bool = False
 
 
 @router.get("/rows")
-def read_rows():
+def read_rows(lookup_column: str | None = None, lookup_value: str | None = None):
     with _locked_book() as (_, sheet, __):
         headers = _headers(sheet)
-        return [_row(sheet, n, headers) for n in range(2, sheet.max_row + 1)
+        rows = [_row(sheet, n, headers) for n in range(2, sheet.max_row + 1)
                 if any(sheet.cell(n, i).value is not None
                        for i in range(1, sheet.max_column + 1))]
+        if lookup_column is not None:
+            if lookup_column not in headers or lookup_value is None:
+                raise HTTPException(422, "Filtro de fila inválido.")
+            rows = [row for row in rows if str(row.get(lookup_column, "")) == lookup_value]
+        return rows
 
 
 @router.post("/rows")
@@ -121,6 +128,8 @@ def write_row(payload: RowInput):
                 break
         number = number or sheet.max_row + 1
         for key, value in payload.row.items():
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value, ensure_ascii=False)
             cell = sheet.cell(number, headers.index(key) + 1)
             cell.value = value
             # Scraped text must remain text, even if it starts with '='.

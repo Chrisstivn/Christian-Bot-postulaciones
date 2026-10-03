@@ -1,0 +1,1105 @@
+{
+  "name": "Christian Bot postulaciones - Excel local",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($('Releer estado en vivo').item.json.real_apply_url), \"Revisar\": ('SKIPPED: Status leido como \"' + ($json.Status || '(vacio)') + '\", se esperaba READY -- revisa la celda (espacios/mayusculas) o si otro proceso ya la cambio')}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+      },
+      "id": "25d5e012-738f-4b1b-b5e5-37ea4e7626dc",
+      "name": "Debug: Fila ya no esta READY",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        28256,
+        -14480
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst THREE_HOURS_MS = 3 * 60 * 60 * 1000;\nconst now = Date.now();\nconst last = staticData.lastLinkedInScrapeAt || 0;\nconst shouldRun = (now - last) >= THREE_HOURS_MS;\nif (shouldRun) {\n  staticData.lastLinkedInScrapeAt = now;\n}\nreturn [{ json: { should_scrape_linkedin: shouldRun, minutes_since_last: Math.round((now - last) / 60000) } }];"
+      },
+      "id": "dfbbd6a1-247d-40d2-878d-d4316da74c24",
+      "name": "Gate: pasaron 3h desde ultimo scraping LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25952,
+        -14688
+      ],
+      "notes": "Guarda el timestamp del ultimo scraping de LinkedIn en el static data del workflow (persiste entre ejecuciones). Si no pasaron 3h todavia, should_scrape_linkedin=false y la rama de LinkedIn no hace nada esta vuelta -- pero Leer filas del Excel / Create PDF SI corren, porque esos van directo desde el trigger, sin pasar por este gate."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_should_scrape",
+              "leftValue": "={{ $json.should_scrape_linkedin }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a26e922-621a-4a55-9b69-20a0b0561793",
+      "name": "¿Toca scrapear LinkedIn ahora?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        26176,
+        -14688
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "lookup_column",
+              "value": "real_apply_url"
+            },
+            {
+              "name": "lookup_value",
+              "value": "={{ $json.real_apply_url }}"
+            }
+          ]
+        }
+      },
+      "id": "73582754-7480-4c7c-b9c2-194154d7912d",
+      "name": "Releer estado en vivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        26864,
+        -14448
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond_still_ready",
+              "leftValue": "={{ ($json.Status || '').trim().toUpperCase() }}",
+              "rightValue": "READY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fd82c841-e8ef-496d-b79a-8510c28d8009",
+      "name": "¿Sigue en READY?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27136,
+        -14512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "search_url_field",
+              "name": "search_urls_raw",
+              "value": "https://www.linkedin.com/jobs/search/?location=Chile",
+              "type": "string"
+            },
+            {
+              "id": "max_jobs_field",
+              "name": "max_jobs",
+              "value": 10000,
+              "type": "number"
+            },
+            {
+              "id": "backlog_pages_field",
+              "name": "backlog_pages",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "217fb875-d1cd-48db-94d9-f1ff964014d6",
+      "name": "Search Params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        26736,
+        -14624
+      ],
+      "notes": "Pegá UN link de búsqueda de LinkedIn por línea (podés poner 5, 10, los que quieras). Cada uno se procesa COMPLETO -- scraping + triage + guardado en el Sheet -- antes de pasar al siguiente."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/linkedin-search-and-triage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { search_url: $json.search_url, max_jobs: $json.max_jobs || 10000, backlog_pages: $json.backlog_pages || 2 } }}",
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "a610e98d-35cf-4ede-8387-d6f0632d265e",
+      "name": "Call LinkedIn Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        26944,
+        -14608
+      ],
+      "notes": "El backend revisa start=0 para nuevas + backlog paginado. Usa new_job_urls para no mandar duplicados al triage."
+    },
+    {
+      "parameters": {
+        "jsCode": "const outputs = [];\nfor (const item of $input.all()) {\n  const urls = Array.isArray(item.json.new_job_urls) ? item.json.new_job_urls : [];\n  for (const u of urls) {\n    const url = String(u || '').trim();\n    if (url) outputs.push({ json: { url, empty_batch: false } });\n  }\n}\nif (outputs.length === 0) {\n  return [{ json: { empty_batch: true } }];\n}\nreturn outputs;"
+      },
+      "id": "5be4ec73-83a5-4b9e-834c-2578a6226823",
+      "name": "Split URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27344,
+        -14608
+      ],
+      "notes": "Expande TODOS los new_job_urls recibidos en items individuales. Usa $input.all() para no perder resultados de ejecuciones previas."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/triage-job",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.url || $json.job_url || '' } }}",
+        "options": {}
+      },
+      "id": "ef89b147-0f4f-42d4-bd2d-e6ff2890fc87",
+      "name": "Call /triage-job (sin filtro de idioma)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        27552,
+        -14624
+      ],
+      "continueOnFail": true,
+      "notes": "Triage de UNA oferta del loop interno. El body usa exclusivamente la URL del item actual. Nunca debe recibir items de control del loop."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_triage_ready",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4d7324d-db5e-4903-b1ed-3e7ab4201494",
+      "name": "Filter: Solo status=ready",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        27744,
+        -14624
+      ],
+      "notes": "TRUE: ready -> guardar en Sheet -> volver al loop interno. FALSE: discarded/failed/duplicate -> volver directamente al loop interno."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"Link\": ($json.job_url), \"Status\": (\"NEW\"), \"company\": ($json.company), \"job_title\": ($json.job_title), \"added_at\": ($now.toISO()), \"description\": ($json.description), \"Format\": ($json.work_format || ''), \"Salary\": ($json.salary_range || '')}, matching_columns: [\"Link\"], preserve_existing: true } }}"
+      },
+      "id": "04588fb1-bc76-46f0-b590-c23f79937723",
+      "name": "Guardar ofertas nuevas en Excel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        27952,
+        -14624
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond_status_ready",
+              "leftValue": "={{ ($json.Status || '').trim().toUpperCase() }}",
+              "rightValue": "READY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1cd54ebe-f187-4c61-b197-6dc17e7e079a",
+      "name": "Filter Ready",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        26720,
+        -14272
+      ],
+      "notes": "Solo pasan filas con Status=READY Y real_apply_url completado a mano. AsÃ­ nunca se procesa un link de LinkedIn 'crudo' sin que vos hayas revisado primero."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/create-application-pdf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.real_apply_url, job_text: $json.description || $json.job_text || \"\", from_sheet: true } }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "b96bcb51-5faa-4de8-8ffe-fe8e0b1b4252",
+      "name": "1 - Create PDF (PRO)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        27136,
+        -14288
+      ],
+      "retryOnFail": true,
+      "continueOnFail": true,
+      "notes": "Crea CV/DOCX/PDF reutilizando job_text del paso anterior para evitar re-scraping. Timeout 20 min porque Gemini + Word/PDF puede tardar mas de 5 min."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_pdf_ready",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "pdf_ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7e31b372-0954-40e2-96c0-c441e4e6fa14",
+      "name": "PDF Ready? (PRO)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        27488,
+        -14048
+      ],
+      "notes": "Solo ejecuta autofill cuando el PDF ya existe. Si se descarta, pasa al Switch existente."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/autofill-application",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.real_apply_url, job_text: \"\", pdf_name: $json.pdf_name || \"\" } }}",
+        "options": {
+          "timeout": 1200000
+        }
+      },
+      "id": "8678e767-60f0-4929-912c-d8af1000fa7e",
+      "name": "2 - Autofill Existing PDF (PRO)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        27744,
+        -14128
+      ],
+      "retryOnFail": true,
+      "continueOnFail": true,
+      "notes": "Reintenta solo este nodo si falla Playwright/CAPTCHA/ATS. Reutiliza pdf_path creado por el nodo anterior."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "3584a8d9-9681-4cee-acb7-c14b8f33c3e0",
+      "name": "Schedule (Buscar en LinkedIn)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        26544,
+        -14624
+      ],
+      "notes": "Ejecuta LinkedIn cada 3 horas. Evita que un segundo run arranque cada 2 min mientras el search+triage anterior sigue procesando."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "8b5d5629-86eb-4b6e-ad35-4215945cbe31",
+      "name": "Leer filas del Excel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        26560,
+        -14400
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"pdf_name\": ($json.pdf_name), \"real_apply_url\": ($json.source_url || $('Filter Ready').item.json.real_apply_url), \"Status\": ($json.status), \"Revisar\": ('revisar \"' + ($json.source_url || $('Filter Ready').item.json.real_apply_url || '') + '\"')}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        27520,
+        -14320
+      ],
+      "id": "ed7252fc-2991-4983-aba5-67d2e1fe2614",
+      "name": "Guardar PDF en Excel",
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.search_urls_raw || '';\nconst maxJobs = $json.max_jobs;\nconst backlogPages = $json.backlog_pages;\nconst urls = raw.split('\\n').map(s => s.trim()).filter(Boolean);\nreturn urls.map(u => ({ json: { search_url: u, max_jobs: maxJobs, backlog_pages: backlogPages } }));"
+      },
+      "id": "233c3acd-9a84-4730-9d76-f58c7d7b98bb",
+      "name": "Split Search URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26944,
+        -14832
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e64c22c4-69f9-44ee-bd4d-08272a51a43c",
+      "name": "Loop Over Search Links (1 a la vez)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        27360,
+        -14832
+      ],
+      "notes": "Loop exterior: un search link por vez. /linkedin-search-and-triage bloquea hasta terminar todo el triage del link actual."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($json.real_apply_url), \"Status\": ($json.status), \"reason\": ($json.autofill)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+      },
+      "id": "b789108a-0700-4974-b902-f15c880acdb6",
+      "name": "Actualizar Excel tras autofill",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        28176,
+        -14128
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        27024,
+        -14048
+      ],
+      "id": "6fd3f7b0-f5c3-4ac2-956c-9dcd6a0692de",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond_has_error",
+              "leftValue": "={{ $json.error ? String($json.error) : '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b777931a-2ce1-4a0e-abcd-c6e55c330e08",
+      "name": "¿Create PDF Falló?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27328,
+        -14384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($json.real_apply_url || $json.url), \"Status\": (\"failed\"), \"reason\": ($json.error)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+      },
+      "id": "6de6042c-8313-439e-8b63-9922504561cb",
+      "name": "Marcar Create PDF Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        27536,
+        -14480
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond_has_error",
+              "leftValue": "={{ $json.error ? String($json.error) : '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5f83432-b051-4282-aa70-d13c8c67032b",
+      "name": "¿Autofill Falló?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27936,
+        -14224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/excel-output/rows",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { row: {\"real_apply_url\": ($json.real_apply_url || $json.url), \"Status\": (\"failed\"), \"autofill\": ($json.error)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+      },
+      "id": "98bd949a-49bf-4e60-9d42-ed1d675a5e15",
+      "name": "Marcar Autofill Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        28144,
+        -14320
+      ],
+      "continueOnFail": true,
+      "notes": "Lee o actualiza el Excel local data/postulaciones.xlsx mediante el backend de Christian. No usa Google Sheets."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Colapsa TODOS los items (las N ofertas que encontro esta URL de busqueda) en 1 solo item de senal -- Loop Over Search Links necesita un 'segui' simple, no el batch completo, o reinicia el loop al item 1 en vez de avanzar a la siguiente busqueda.\nreturn [{ json: { search_url_done: true, jobs_found: $input.all().length } }];"
+      },
+      "id": "6feadb60-ae6b-49d3-bd63-f9dab7d3fc87",
+      "name": "Colapsar a 1 item (fin de esta búsqueda)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27952,
+        -14416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond_empty_batch",
+              "leftValue": "={{ $json.empty_batch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d6f7b949-8873-4a52-b27e-2e3046291ab8",
+      "name": "¿Búsqueda sin ofertas nuevas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27584,
+        -14832
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a551f5ed-0476-478c-92f3-437d877d8bc2",
+      "name": "Loop Ofertas de ESTE link",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        27776,
+        -14832
+      ],
+      "notes": "Barrera por search link. Procesa 1 oferta por iteración y NO libera el siguiente search hasta que el batch de new_job_urls termine por completo. reset=true reinicia el batch para cada nuevo search."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond_has_valid_url",
+              "leftValue": "={{ String($json.url || $json.job_url || '').trim() }}",
+              "rightValue": "https://",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "57aba899-9811-4b3a-ab12-9892a2cba940",
+      "name": "¿Item tiene URL válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27984,
+        -14832
+      ],
+      "notes": "TRUE -> /triage-job. FALSE -> vuelve al loop interno sin llamar al backend."
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = Array.isArray($json.ready_jobs) ? $json.ready_jobs : [];\nreturn jobs.map(job => ({ json: job }));"
+      },
+      "id": "aae3178f-1eb7-4d09-9ea6-b1172d7e7545",
+      "name": "Split ready_jobs (backend triage)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27840,
+        -14832
+      ],
+      "notes": "Solo expande ready_jobs devuelto por /linkedin-search-and-triage. El backend ya hizo todo el triage secuencial."
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { search_completed: true } }];"
+      },
+      "id": "331d4474-f886-4d2e-9323-f1efae0002d8",
+      "name": "Avanzar siguiente search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28288,
+        -14720
+      ],
+      "notes": "Se ejecuta una sola vez después de que el backend termina TODA la búsqueda; recién ahí avanza el outer loop."
+    }
+  ],
+  "connections": {
+    "Debug: Fila ya no esta READY": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate: pasaron 3h desde ultimo scraping LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "¿Toca scrapear LinkedIn ahora?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Toca scrapear LinkedIn ahora?": {
+      "main": [
+        [
+          {
+            "node": "Search Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Releer estado en vivo": {
+      "main": [
+        [
+          {
+            "node": "¿Sigue en READY?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sigue en READY?": {
+      "main": [
+        [
+          {
+            "node": "1 - Create PDF (PRO)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Debug: Fila ya no esta READY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Params": {
+      "main": [
+        [
+          {
+            "node": "Split Search URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call LinkedIn Search": {
+      "main": [
+        [
+          {
+            "node": "Split ready_jobs (backend triage)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Avanzar siguiente search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Ready": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 - Create PDF (PRO)": {
+      "main": [
+        [
+          {
+            "node": "¿Create PDF Falló?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Ready? (PRO)": {
+      "main": [
+        [
+          {
+            "node": "2 - Autofill Existing PDF (PRO)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Actualizar Excel tras autofill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 - Autofill Existing PDF (PRO)": {
+      "main": [
+        [
+          {
+            "node": "¿Autofill Falló?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (Buscar en LinkedIn)": {
+      "main": [
+        [
+          {
+            "node": "Gate: pasaron 3h desde ultimo scraping LinkedIn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leer filas del Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer filas del Excel": {
+      "main": [
+        [
+          {
+            "node": "Filter Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar PDF en Excel": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Search URLs": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Search Links (1 a la vez)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Search Links (1 a la vez)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Call LinkedIn Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar Excel tras autofill": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Releer estado en vivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Create PDF Falló?": {
+      "main": [
+        [
+          {
+            "node": "Marcar Create PDF Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardar PDF en Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Create PDF Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Autofill Falló?": {
+      "main": [
+        [
+          {
+            "node": "Marcar Autofill Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Actualizar Excel tras autofill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Autofill Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split ready_jobs (backend triage)": {
+      "main": [
+        [
+          {
+            "node": "Guardar ofertas nuevas en Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avanzar siguiente search": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Search Links (1 a la vez)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timezone": "America/Santiago"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

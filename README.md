@@ -10,6 +10,15 @@ deduplicación, las ofertas cerradas y los fallos de scraping/extracción.
 
 ## Excel de resultados local
 
+Importa **`n8n_christian_postulaciones.json`** en n8n: es la adaptación del flujo
+probado `Job Application Automation (7)`, con sus bucles y conexiones conservados,
+búsqueda para Chile y salida al Excel local. Se quitó la recuperación puntual
+`EXACT80` y las referencias a credenciales y planillas anteriores.
+Se importa desactivado; configúralo y adapta el CV antes de activarlo.
+El horario del flujo usa `America/Santiago` y conserva el intervalo de tres horas.
+En `Search Params`, cambia `search_urls_raw` para añadir las búsquedas que prefieras,
+una URL por línea.
+
 Los flujos n8n de este repositorio leen y escriben `data/postulaciones.xlsx`,
 en la pestaña `Postulaciones`, mediante el backend. Ya no usan el Google Sheets
 del proyecto anterior ni sus credenciales. El archivo se crea automáticamente

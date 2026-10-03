@@ -51,6 +51,18 @@ class ExcelOutputTests(unittest.TestCase):
             output.write_row(output.RowInput(row={"Status": "DONE"}))
         self.assertEqual(output.read_rows(), [])
 
+    def test_live_reread_only_returns_requested_offer(self):
+        for i in range(2):
+            output.write_row(output.RowInput(row={"Link": str(i), "real_apply_url": f"https://example.com/{i}", "Status": "READY"}))
+        rows = output.read_rows(lookup_column="real_apply_url", lookup_value="https://example.com/1")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["Link"], "1")
+        self.assertEqual(output.read_rows(lookup_column="real_apply_url", lookup_value="https://example.com/missing"), [])
+
+    def test_structured_autofill_errors_are_stored_as_text(self):
+        row = output.write_row(output.RowInput(row={"Link": "1", "reason": {"status": "manual_required", "detail": "Revisar"}}))
+        self.assertEqual(json.loads(row["reason"])["status"], "manual_required")
+
     def test_workflows_are_disconnected_from_original_sheet(self):
         total = 0
         for path in Path(__file__).resolve().parents[1].glob("*.json"):
@@ -64,4 +76,23 @@ class ExcelOutputTests(unittest.TestCase):
                     self.assertNotIn("credentials", node)
                     if "Snapshot" in node["name"]:
                         self.assertTrue(node["alwaysOutputData"])
-        self.assertEqual(total, 12)
+        self.assertEqual(total, 20)
+
+    def test_christian_flow_has_chile_search_and_live_lookup(self):
+        path = Path(__file__).resolve().parents[1] / "n8n_christian_postulaciones.json"
+        data = json.loads(path.read_text())
+        self.assertFalse(data["active"])
+        self.assertEqual(len(data["nodes"]), 32)
+        names = {node["name"] for node in data["nodes"]}
+        self.assertFalse(any("EXACT80" in name or "EXACT 80" in name for name in names))
+        for name, ports in data["connections"].items():
+            self.assertIn(name, names)
+            for outputs in ports.values():
+                for edges in outputs:
+                    for edge in edges:
+                        self.assertIn(edge["node"], names)
+        search = next(node for node in data["nodes"] if node["name"] == "Search Params")
+        url = next(field["value"] for field in search["parameters"]["assignments"]["assignments"] if field["name"] == "search_urls_raw")
+        self.assertEqual(url, "https://www.linkedin.com/jobs/search/?location=Chile")
+        lookup = next(node for node in data["nodes"] if node["name"] == "Releer estado en vivo")
+        self.assertEqual(lookup["parameters"]["queryParameters"]["parameters"][0]["value"], "real_apply_url")
