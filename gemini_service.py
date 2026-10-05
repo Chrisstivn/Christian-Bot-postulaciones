@@ -372,8 +372,8 @@ REGLAS DE NEGOCIO (obligatorias):
    empresas, idiomas, seniority o responsabilidades que no aparezcan
    en CV_MAESTRO o JOB_DESCRIPTION.
 
-   Si el título supera 45 caracteres,
-   acórtalo manteniendo únicamente la parte más importante.
+   Si el título supera 45 caracteres, REESCRIBE la frase completa con
+   una formulación más breve. No elimines palabras del final ni cortes listas.
 
    El título debe ser una frase profesional COMPLETA. Nunca puede terminar
    en "de", "del", "para", "en", "con", "&", "and", "or", una coma o cualquier conector colgante. Reescribe la frase completa, nunca la cortes.
@@ -447,8 +447,8 @@ REGLAS DE NEGOCIO (obligatorias):
    Deben ser una MEZCLA entre:
 
    (a) responsabilidades reales que la persona ya realizó, tomadas o
-       inferidas directamente del rol más reciente y de la experiencia
-       previa contenida en CV_MAESTRO.
+       respaldadas directamente por el rol más reciente en CV_MAESTRO.
+       No traslades tareas de cargos anteriores a este puesto.
 
    (b) palabras clave de JOB_DESCRIPTION compatibles con la experiencia
        comprobada. Herramientas y responsabilidades solo si el CV las respalda.
@@ -854,6 +854,26 @@ Devuelve SOLO este JSON, sin texto adicional:
     return adaptation
 
 
+CV_OUTPUT_CHECKLIST = """
+COMPROBACIÓN FINAL OBLIGATORIA ANTES DE EMITIR EL JSON:
+Aplica solo a los campos solicitados. No añadas comentarios ni claves nuevas.
+Cuenta caracteres INCLUYENDO espacios y puntuación en el texto final.
+- nuevo_perfil: objetivo 590-610; límites absolutos 555-635. Si queda corto,
+  desarrolla hechos del CV con oraciones completas; si largo, reescribe.
+- nuevo_titulo: objetivo 40-42; límites absolutos 39-45. Frase profesional
+  completa relacionada con la oferta. Nunca cortes palabras o ideas.
+- nuevo_cargo_actual: máximo 45 antes de la coma, especialización completa.
+- nuevas_tareas: exactamente 4, objetivo 175-185 caracteres CADA una,
+  límites 140-200 cada una y 700-800 en total. Primera persona del presente.
+  Cada una debe cubrir un foco diferente de esta oferta con hechos reales
+  del puesto más reciente, redacción propia y sin copiar tareas históricas.
+Lee cada frase hasta la última palabra: no admitas finales de, del, en, con,
+para, y, o, artículos, comas o listas incompletas. Un punto añadido no completa
+una idea cortada. Si algo incumple, reescribe ese campo antes de responder.
+Los caracteres son una comprobación previa; el PDF medirá las líneas reales.
+"""
+
+
 def _cv_field_problems(adaptation, key):
     prefixes = {
         'nuevo_perfil': ('nuevo_perfil',),
@@ -1037,7 +1057,7 @@ Mandatory style:
         + "}"
     )
 
-    raw = _call_gemini_json(repair_prompt, user_content)
+    raw = _call_gemini_json(repair_prompt + CV_OUTPUT_CHECKLIST, user_content)
 
     return _accept_valid_cv_replacements(adaptation, raw, requested_keys)
 
@@ -1050,8 +1070,7 @@ def _stable_cv_repair_pass(
     """Restore the previously working repair strategy.
 
     Safe deterministic corrections are limited to layout-only changes that do
-    not create new prose: overlong title/current-role title are shortened at
-    word boundaries by _force_fix_adaptation, and an overlong profile may be
+    not create new prose: titles remain complete, and an overlong profile may be
     shortened only at a complete sentence boundary.
 
     Any field that still violates the CV rules is rewritten by Gemini. Bullets
@@ -1089,7 +1108,7 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
     )
 
     # Normal path: ONE complete Gemini generation.
-    raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT, base_content)
+    raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT + CV_OUTPUT_CHECKLIST, base_content)
     adaptation = CVAdaptation.model_validate(raw)
     adaptation = _stable_cv_repair_pass(adaptation, job_description_text, base_content)
     problems = _validate_adaptation(adaptation)
@@ -1105,7 +1124,7 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
           "DEVUELVAS FRAGMENTOS:\n"
         + "\n".join(f"- {p}" for p in problems)
     )
-    raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT, retry_content)
+    raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT + CV_OUTPUT_CHECKLIST, retry_content)
     regenerated = CVAdaptation.model_validate(raw)
     # A full fallback must not regress fields already satisfying the layout.
     for key in ('nuevo_perfil', 'nuevo_titulo', 'nuevo_cargo_actual', 'nuevas_tareas'):
@@ -1156,7 +1175,7 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
                f"PROBLEMAS DEL PDF REAL:\n{json.dumps(problems, ensure_ascii=False)}\n"
                f"CAMPOS A DEVOLVER: {json.dumps(keys)}\n"
                f"TEXTO ACTUAL:\n{adaptation.model_dump_json()}")
-    raw = _call_gemini_json(prompt, content)
+    raw = _call_gemini_json(prompt + CV_OUTPUT_CHECKLIST, content)
     if not isinstance(raw, dict) or set(raw) != set(keys):
         raise ValueError("La reparación del PDF debe devolver solo los campos solicitados")
     repaired = CVAdaptation.model_validate({**adaptation.model_dump(), **raw})
@@ -1174,7 +1193,7 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
               "Perfil: apunta a 570 caracteres, nunca menos de 555. "
               "Reescribe oraciones completas usando solo hechos del maestro."
         )
-        correction = _call_gemini_json(prompt, correction_content)
+        correction = _call_gemini_json(prompt + CV_OUTPUT_CHECKLIST, correction_content)
         if not isinstance(correction, dict) or set(correction) != set(invalid_keys):
             raise ValueError("La corrección del PDF debe devolver solo los campos inválidos")
         repaired = CVAdaptation.model_validate({**repaired.model_dump(), **correction})
