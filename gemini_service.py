@@ -410,8 +410,8 @@ REGLAS DE NEGOCIO (obligatorias):
    caracteres, siempre como oración completa.
 
    TODAS las responsabilidades del rol más reciente deben escribirse en
-   primera persona del PRESENTE: "Gestiono", "Planifico", "Coordino",
-   "Implemento", "Analizo". No uses pasado ni infinitivos como verbo principal.
+   INFINITIVO: "Gestionar", "Planificar", "Coordinar",
+   "Implementar", "Analizar". No uses pasado ni presente como verbo principal.
    Prioriza los requisitos y responsabilidades de JOB_DESCRIPTION que estén
    respaldados por las funciones REALES del rol más reciente en CV_MAESTRO.
    Redacta desde las prioridades concretas de ESTA oferta, no una lista
@@ -424,7 +424,7 @@ REGLAS DE NEGOCIO (obligatorias):
    otro cargo histórico. No copies ni parafrasees los bullets de cargos
    anteriores: cuatro responsabilidades distintas, concretas y pertinentes
    a esta oferta, sin repetir la misma idea con otros verbos.
-   Conserva íntegros los cargos históricos y las fechas, aunque uses presente.
+   Conserva íntegros los cargos históricos y las fechas, aunque uses infinitivo.
 
    REGLA DE ESTILO OBLIGATORIA:
    - NO uses estos verbos/palabras en "nuevas_tareas": "orchestrated",
@@ -583,9 +583,12 @@ def _bullet_style_problems(text: str) -> list[str]:
     if _people_management_claim(bullet):
         problems.append('atribuye liderazgo de equipos o personas a cargo, prohibido')
     lowered = bullet.lower()
+    first = re.match(r"[a-záéíóúüñ]+", lowered)
+    if first and not first.group().endswith(('ar','er','ir')):
+        problems.append('debe comenzar con un verbo en infinitivo')
     past_verbs = r"gestioné|lideré|desarrollé|implementé|coordiné|analicé|administré|planifiqué|supervisé|optimicé|identifiqué|automaticé|elaboré|controlé|realicé|aseguré|monitoreé|evalué|participé|colaboré|apoyé"
     if re.search(rf"\b(?:{past_verbs})\b", lowered):
-        problems.append("usa pasado; las tareas del último puesto deben estar en presente")
+        problems.append("usa pasado; las tareas del último puesto deben estar en infinitivo")
     banned = [
         word for word in _BANNED_CV_BULLET_WORDS
         if re.search(rf"\b{re.escape(word)}\b", lowered)
@@ -849,7 +852,7 @@ quede entre 700 y 800 (8 líneas completas combinadas). Nunca inventes
 empresas, tecnologías, certificaciones ni responsabilidades que no
 puedan inferirse razonablemente de CV_MAESTRO.
 
-Todo en español, primera persona del presente ("Gestiono", "Lidero", "Desarrollo"...). Nunca
+Todo en español, infinitivo ("Gestionar", "Coordinar", "Desarrollar"...). Nunca
 coma antes de "y". Nunca uses guion ni raya. Deben seguir siendo
 EXACTAMENTE 4 bullets. Cada bullet debe ser una oración completa entre
 140 y 200 caracteres; si queda largo, REESCRÍBELO más corto, nunca lo
@@ -890,7 +893,7 @@ Cuenta caracteres INCLUYENDO espacios y puntuación en el texto final.
   completa relacionada con la oferta. Nunca cortes palabras o ideas.
 - nuevo_cargo_actual: máximo 45 antes de la coma, especialización completa.
 - nuevas_tareas: exactamente 4, objetivo 175-185 caracteres CADA una,
-  límites 140-200 cada una y 700-800 en total. Primera persona del presente.
+  límites 140-200 cada una y 700-800 en total. Infinitivo.
   Cada una debe cubrir un foco diferente de esta oferta con hechos reales
   del puesto más reciente, redacción propia y sin copiar tareas históricas.
 Lee cada frase hasta la última palabra: no admitas finales de, del, en, con,
@@ -1025,7 +1028,7 @@ def _repair_invalid_cv_fields_with_gemini(
         invalid_fields.append(
             "Return the four nuevas_tareas in the same order but rewrite ONLY invalid bullets. "
             "Copy valid bullets exactly, without changing a character. Each must be a complete natural "
-            "first-person present-tense sentence, preferably 175-185 characters, and EACH "
+            "infinitive-led sentence, preferably 175-185 characters, and EACH "
             "must fit in at most TWO visual lines. The four combined must "
             "still be 700-800 characters and none may use: orchestrated, engineered, "
             "leveraged, owned, translated, collaborated, defined or drove. "
@@ -1062,7 +1065,7 @@ Mandatory style:
 - Write natural, original sentences around this vacancy's concrete priorities.
   Do not copy vacancy phrases/order or produce generic CV bullets; preserve
   necessary technical terms. Four distinct focuses, not repeated synonyms.
-- Current-role tasks: first-person PRESENT tense (Gestiono, Planifico, Coordino).
+- Current-role tasks: INFINITIVE form (Gestionar, Planificar, Coordinar).
 - Tailor four distinct tasks to JOB_DESCRIPTION using only documented current-role
   facts. Never borrow a historical role's tasks or reword its bullets. Do not
   claim an unsupported responsibility just because the vacancy requests it.
@@ -1192,7 +1195,7 @@ Repara SOLO los campos solicitados de un CV que ya fue renderizado a PDF.
 Devuelve JSON estricto con solo esos campos. Todo en español. Conserva los
 hechos del CV_MAESTRO; no inventes herramientas, logros, años ni funciones.
 No modifiques empresa, fechas, cargo actual ni roles históricos.
-Tareas actuales en presente, primera persona, cuatro ideas distintas orientadas
+Tareas actuales en infinitivo, cuatro ideas distintas orientadas
 al rol solicitado y respaldadas por el rol más reciente del maestro. No copies
 ni parafrasees tareas históricas ni atribuyas a Siemens experiencia de Volvo.
 Redacta frases naturales y originales según las prioridades de esta oferta;
@@ -1203,7 +1206,7 @@ Mantén perfil 450-635 caracteres, oraciones completas y 5 o 6 líneas.
 Si el perfil actual ocupa 7 o más líneas, apunta a 450-580 caracteres y usa
 palabras de ancho menor. Si ocupa menos de 5, desarrolla hechos reales sin
 superar 635. Nunca lo cortes mecánicamente ni cambies la fuente.
-Tareas: exactamente 4, primera persona del presente, 140-200 cada una y 700-800 en total; máximo 2
+Tareas: exactamente 4, infinitivo, 140-200 cada una y 700-800 en total; máximo 2
 líneas cada una. Usa frases completas. Sin guiones, rayas ni coma antes de y.
 No uses orchestrated, engineered, leveraged, owned, translated, collaborated,
 defined ni drove. Estos textos deben caber en las fuentes reales del maestro.

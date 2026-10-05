@@ -234,8 +234,10 @@ JSON. La regeneración de respaldo conserva campos que ya cumplen sus reglas
 para evitar regresiones. Las pruebas usan respuestas simuladas; Gemini real
 se verifica en la laptop. Los guardarraíles y la validación PDF siguen activos.
 
-El PDF usa `CV_Christian_Molina_{Empresa}_({InicialesDelRol}).pdf`. Las cuatro tareas del puesto más reciente se redactan en primera persona del presente, según las prioridades de cada oferta y con redacción propia, respaldadas por la experiencia documentada. Los puestos históricos permanecen intactos. Los títulos se reformulan completos; nunca se recortan mecánicamente al límite de caracteres.
+El PDF usa `CV_Christian_Molina_{Empresa}_({InicialesDelRol}).pdf`. Las cuatro tareas del puesto más reciente se redactan en infinitivo, según las prioridades de cada oferta y con redacción propia, respaldadas por la experiencia documentada. Los puestos históricos permanecen intactos. Los títulos se reformulan completos; nunca se recortan mecánicamente al límite de caracteres.
 
 Las reparaciones de adaptación realizan hasta cuatro correcciones dirigidas por ronda. Cada bullet válido se conserva exactamente, también en el intento de respaldo; solo se reemplazan bullets inválidos. Sobre mí y las tareas actuales no pueden atribuir liderazgo de equipos ni personas a cargo. Coordinación con áreas, clientes o proveedores está permitida. Si se agotan los intentos sin cumplir, no se entrega el PDF.
 
 Sobre mí acepta cinco o seis líneas reales y entre 450 y 635 caracteres; ya no se fuerza una sexta línea. Se mantiene el máximo para evitar desbordamiento y el PDF debe conservar dos páginas.
+
+Las tareas del último puesto empiezan con verbos en infinitivo: Gestionar, Planificar, Coordinar, Analizar.

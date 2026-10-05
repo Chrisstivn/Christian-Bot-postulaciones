@@ -52,7 +52,7 @@ class CvBulletStyleTests(unittest.TestCase):
 
     def test_complete_natural_sentence_passes_style_guard(self):
         problems = gemini_service._bullet_style_problems(
-            "Led regional analytics projects and built dashboards that improved decision making across EMEA markets."
+            "Coordinar regional analytics projects and built dashboards that improved decision making across EMEA markets."
         )
         self.assertEqual(problems, [])
 
@@ -61,10 +61,10 @@ class CvBulletStyleTests(unittest.TestCase):
 class GeminiTargetedRepairTests(unittest.TestCase):
     def test_repairs_only_invalid_profile_and_title_with_gemini_text(self):
         bullets = [
-            "Led regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial teams.",
-            "Developed Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights.",
-            "Managed cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business needs.",
-            "Analyzed campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed business decisions.",
+            "Coordinar regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial teams.",
+            "Desarrollar Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights.",
+            "Gestionar cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business needs.",
+            "Analizar campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed business decisions.",
         ]
         adaptation = CVAdaptation(
             nuevo_titulo="Senior Product Analytics Specialist",
@@ -107,10 +107,10 @@ class GeminiTargetedRepairTests(unittest.TestCase):
 class StableCvFlowTests(unittest.TestCase):
     def test_overlong_profile_and_short_title_use_one_targeted_repair(self):
         bullets = [
-            "Led regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial and product teams.",
-            "Developed Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights for regional teams.",
-            "Managed cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business and analytics needs.",
-            "Analyzed campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed decisions across EMEA markets.",
+            "Coordinar regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial and product teams.",
+            "Desarrollar Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights for regional teams.",
+            "Gestionar cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business and analytics needs.",
+            "Analizar campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed decisions across EMEA markets.",
         ]
         long_profile = "A" * 300 + ". " + "B" * 300 + ". " + "C" * 173 + "."
 
@@ -149,10 +149,10 @@ class StableCvFlowTests(unittest.TestCase):
             nuevo_perfil=long_profile,
             nuevo_cargo_actual="Senior Product Data Analyst",
             nuevas_tareas=[
-                "Led regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial and product teams.",
-                "Developed Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights for regional teams.",
-                "Managed cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business and analytics needs.",
-                "Analyzed campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed decisions across EMEA markets.",
+                "Coordinar regional analytics initiatives across EMEA markets and built reporting solutions that improved visibility, decision making and execution for commercial and product teams.",
+                "Desarrollar Power BI dashboards and performance reporting used across multiple markets, reducing manual work and improving access to consistent business insights for regional teams.",
+                "Gestionar cross functional data projects with commercial and technical stakeholders, aligning requirements and delivering practical solutions for regional business and analytics needs.",
+                "Analizar campaign and commercial performance using structured reporting and KPI frameworks, identifying opportunities and supporting data informed decisions across EMEA markets.",
             ],
             empresa_actual_sin_cambios="Stanley Black & Decker",
             fechas_actual_sin_cambios="(Aug 2024 – Jun 2026)",
