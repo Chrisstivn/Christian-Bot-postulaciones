@@ -23,6 +23,28 @@ class RepairSelectionTests(unittest.TestCase):
         title = original.nuevo_titulo
         self.assertEqual(service._force_fix_adaptation(original).nuevo_titulo, title)
 
+    def test_word_adapter_never_cuts_title_words_or_comma_clauses(self):
+        import docx_adapter
+        titles = [
+            'Ingeniero de Planificación y Control de Proyectos',
+            'Ingeniero de Proyectos, Planificación y Control',
+            'Ingeniero de Proyectos - Planificación y Control',
+            'Ingeniero de Proyectos (Planificación y Control)',
+        ]
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertEqual(docx_adapter._shorten_title_to_two_lines(title), title)
+
+    def test_word_adapter_rejects_overlong_title_without_modifying_document(self):
+        from docx import Document
+        import docx_adapter
+        doc = Document()
+        heading = doc.add_paragraph('Christian Molina | Gestión de proyectos')
+        before = heading.text
+        with self.assertRaises(ValueError):
+            docx_adapter.update_main_title(doc, 'Ingeniero de Planificación y Control de Proyectos')
+        self.assertEqual(heading.text, before)
+
     def test_current_tasks_reject_past_and_allow_present(self):
         self.assertTrue(any('presente' in p for p in service._bullet_style_problems('Desarrollé los cronogramas del proyecto.')))
         self.assertEqual(service._bullet_style_problems('Desarrollo los cronogramas del proyecto.'), [])

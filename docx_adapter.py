@@ -236,51 +236,11 @@ def _estimated_bullet_lines(task: str) -> int:
 
 
 def _shorten_title_to_two_lines(nuevo_titulo: str, max_chars: int = MAX_TITLE_CHARS) -> str:
-    """Los job titles reales vienen con sufijos que Gemini copia tal cual
-    de la oferta (ej. 'Performance Marketing Manager - Lead Generation &
-    Growth (f/m/d)'), pero el estilo 'Ttulo' del CV solo tiene espacio
-    para 2 líneas antes de romper el layout del encabezado (empuja la
-    foto/dirección hacia abajo). En vez de dejar que Word reparta esto en
-    3 líneas, recortamos lo no esencial en este orden:
-      1. Anotaciones de género entre paréntesis al final, ej. '(f/m/d)',
-         '(m/w/d)', '(w/m/d)' -> no aportan nada al CV.
-      2. Todo lo que va después de un guion largo o un ' - ' con espacios
-         (normalmente el subtítulo de la oferta, no el cargo en sí) -> se
-         corta ahí.
-      3. Si aún así no cabe, se recorta al último espacio dentro del
-         presupuesto de caracteres (nunca se corta una palabra a la
-         mitad).
+    """Preserve Gemini's complete title; validation requests a rewrite if needed.
+
+    Never remove comma clauses, parenthetical text or words to fit the layout.
     """
-    titulo = nuevo_titulo.strip()
-
-    # 1. Quitar anotaciones de género tipo "(f/m/d)" al final (puede haber
-    #    más de una, ej. "... (f/m/d) (all genders)")
-    while True:
-        sin_parentesis = re.sub(r"\s*\([^)]*\)\s*$", "", titulo).strip()
-        if sin_parentesis == titulo:
-            break
-        titulo = sin_parentesis
-
-    if len(titulo) <= max_chars:
-        return titulo
-
-    # 2. Cortar en el primer separador de "subtítulo": guion largo/medio
-    #    o COMA (ej. "Manager, Lead Generation & Growth" -> "Manager").
-    #    Sin la coma acá, el recorte duro del paso 3 puede caer a mitad de
-    #    la segunda mitad del título y dejar una palabra suelta colgando
-    #    (ej. el bug "Performance Marketing Manager, Lead").
-    match = re.search(r"\s[\u2013\u2014]\s|\s-\s|,\s*", titulo)
-    if match:
-        titulo_corto = titulo[: match.start()].strip()
-        if titulo_corto:
-            titulo = titulo_corto
-
-    if len(titulo) <= max_chars:
-        return titulo
-
-    # 3. Último recurso: recorte duro por palabra completa.
-    recortado = titulo[:max_chars].rsplit(" ", 1)[0].strip()
-    return recortado or titulo[:max_chars].strip()
+    return nuevo_titulo.strip()
 
 
 def update_main_title(doc: Document, nuevo_titulo: str) -> None:
@@ -293,10 +253,12 @@ def update_main_title(doc: Document, nuevo_titulo: str) -> None:
         raise ValueError("El formato 'Nombre | Título' cambió en el CV; revisa el ancla.")
     name_part = full_text.split("|")[0].strip()
     titulo_final = _shorten_title_to_two_lines(nuevo_titulo)
+    if len(titulo_final) > MAX_TITLE_CHARS:
+        raise ValueError("nuevo_titulo supera 45 caracteres; Gemini debe reescribirlo completo, sin recortes")
     if len(titulo_final) < MIN_TITLE_CHARS:
         raise ValueError(
-            f"nuevo_titulo quedó en {len(titulo_final)} caracteres tras el "
-            f"recorte (mínimo {MIN_TITLE_CHARS}) -> probablemente no llena "
+            f"nuevo_titulo tiene {len(titulo_final)} caracteres "
+            f"(mínimo {MIN_TITLE_CHARS}) -> probablemente no llena "
             f"las 2 líneas. Se aborta antes de generar un CV con el título "
             f"corto; revisa el largo que devuelve Gemini."
         )
