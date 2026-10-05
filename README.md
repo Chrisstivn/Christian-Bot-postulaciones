@@ -226,3 +226,10 @@ anterior, porque el objeto error de HTTP puede omitir la URL. Los reintentos
 automáticos de generación PDF/autofill están desactivados para no repetir
 llamadas a Gemini ante errores de validación/configuración. La búsqueda
 LinkedIn conserva cinco intentos con cinco segundos entre intentos.
+
+La adaptación conserva el flujo original: generación, reparación de campos
+inválidos y una única regeneración de respaldo. La reparación solo acepta
+reemplazos que cumplan los límites medidos; no corta frases ni cambia el esquema
+JSON. La regeneración de respaldo conserva campos que ya cumplen sus reglas
+para evitar regresiones. Las pruebas usan respuestas simuladas; Gemini real
+se verifica en la laptop. Los guardarraíles y la validación PDF siguen activos.

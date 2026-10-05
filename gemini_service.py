@@ -842,6 +842,38 @@ Devuelve SOLO este JSON, sin texto adicional:
     return adaptation
 
 
+def _cv_field_problems(adaptation, key):
+    prefixes = {
+        'nuevo_perfil': ('nuevo_perfil',),
+        'nuevo_titulo': ('nuevo_titulo',),
+        'nuevo_cargo_actual': ('nuevo_cargo_actual',),
+        'nuevas_tareas': ('bullet ', 'nuevas_tareas'),
+    }
+    return [p for p in _validate_adaptation(adaptation) if p.startswith(prefixes[key])]
+
+
+def _accept_valid_cv_replacements(adaptation, raw, keys):
+    """Accept measured model-written repairs; never truncate text."""
+    if not isinstance(raw, dict):
+        raise ValueError('La reparación del CV debe devolver un objeto JSON')
+    for key in keys:
+        options = [raw.get(key)]
+        for value in options:
+            if key == 'nuevas_tareas':
+                if not isinstance(value, list) or len(value) != 4 or not all(isinstance(t, str) for t in value):
+                    continue
+                value = [t.strip() for t in value]
+            elif isinstance(value, str):
+                value = value.strip()
+            else:
+                continue
+            trial = CVAdaptation.model_validate({**adaptation.model_dump(), key: value})
+            if not _cv_field_problems(trial, key):
+                adaptation = trial
+                break
+    return adaptation
+
+
 def _repair_invalid_cv_fields_with_gemini(
     adaptation: "CVAdaptation",
     job_description_text: str,
@@ -967,6 +999,9 @@ Mandatory style:
 - Preserve facts already present in the supplied text.
 - Never invent a tool, company, metric, certification or responsibility.
 - Return strict JSON only.
+- Character limits are mandatory: perfil 555-635 (target 585-610),
+  title 39-45, current role before comma at most 45, four bullets 140-200
+  each and 700-800 total. Each bullet must fit two visual lines.
 """
 
     user_content = (
@@ -983,27 +1018,7 @@ Mandatory style:
 
     raw = _call_gemini_json(repair_prompt, user_content)
 
-    if "nuevo_perfil" in requested_keys:
-        value = str(raw.get("nuevo_perfil", "")).strip()
-        if value:
-            adaptation.nuevo_perfil = value
-
-    if "nuevo_titulo" in requested_keys:
-        value = str(raw.get("nuevo_titulo", "")).strip()
-        if value:
-            adaptation.nuevo_titulo = value
-
-    if "nuevo_cargo_actual" in requested_keys:
-        value = str(raw.get("nuevo_cargo_actual", "")).strip()
-        if value:
-            adaptation.nuevo_cargo_actual = value
-
-    if "nuevas_tareas" in requested_keys:
-        value = raw.get("nuevas_tareas")
-        if isinstance(value, list) and len(value) == 4:
-            adaptation.nuevas_tareas = [str(item).strip() for item in value]
-
-    return adaptation
+    return _accept_valid_cv_replacements(adaptation, raw, requested_keys)
 
 
 def _stable_cv_repair_pass(
@@ -1070,8 +1085,12 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
         + "\n".join(f"- {p}" for p in problems)
     )
     raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT, retry_content)
-    adaptation = CVAdaptation.model_validate(raw)
-    adaptation = _stable_cv_repair_pass(adaptation, job_description_text, base_content)
+    regenerated = CVAdaptation.model_validate(raw)
+    # A full fallback must not regress fields already satisfying the layout.
+    for key in ('nuevo_perfil', 'nuevo_titulo', 'nuevo_cargo_actual', 'nuevas_tareas'):
+        if not _cv_field_problems(adaptation, key):
+            setattr(regenerated, key, getattr(adaptation, key))
+    adaptation = _stable_cv_repair_pass(regenerated, job_description_text, base_content)
     final_problems = _validate_adaptation(adaptation)
 
     if final_problems:
