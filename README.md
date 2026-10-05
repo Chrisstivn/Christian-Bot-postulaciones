@@ -211,3 +211,18 @@ y estudios que acepten Ingeniería Civil Industrial o Ingeniería Industrial.
 Se reconocen tildes y abreviaturas (Ing., Ing Civil Industrial, Civil Industrial).
 Una carrera distinta con «afín/similar» queda pendiente si no se confirma
 compatibilidad. Negratín se excluye explícitamente por preferencia del candidato.
+
+### Conversión Word y registro de errores PDF
+
+El script PowerShell está incluido en `scripts/word_to_pdf.ps1`. El backend
+resuelve su ruta mediante wslpath; ya no exige crearlo en C:\Scripts.
+Si una configuración anterior apunta a un script inexistente, inicia con
+`export WORD_TO_PDF_SCRIPT=""` para utilizar el incluido. Microsoft Word debe
+estar instalado en Windows. Las pruebas locales verifican configuración y
+argumentos; ejecutar Word real requiere la laptop Windows/WSL.
+
+Los nodos que registran fallos PDF/autofill recuperan real_apply_url del nodo
+anterior, porque el objeto error de HTTP puede omitir la URL. Los reintentos
+automáticos de generación PDF/autofill están desactivados para no repetir
+llamadas a Gemini ante errores de validación/configuración. La búsqueda
+LinkedIn conserva cinco intentos con cinco segundos entre intentos.

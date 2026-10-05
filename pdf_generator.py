@@ -1,56 +1,11 @@
 r"""
-pdf_generator.py
-Conversión docx -> pdf usando MICROSOFT WORD REAL vía PowerShell desde WSL.
+Conversión DOCX a PDF con Word real desde WSL o LibreOffice en Linux.
 
-Por qué se cambió de LibreOffice a Word:
-  LibreOffice re-renderiza el documento con su propio motor de layout
-  (fuentes, kerning, saltos de página, márgenes) y eso hacía que el PDF
-  final se viera distinto al .docx original, sobre todo en el encabezado.
-  Word real produce un PDF idéntico al docx porque usa el mismo motor que
-  lo escribió.
-
-Cómo funciona (WSL -> Windows -> WSL):
-  1. Python (corriendo en WSL/Ubuntu) recibe la ruta del .docx, que vive en
-     algo como /home/candidate/mi_proyecto_gemini/work/CV_xxx.docx
-  2. Convertimos esa ruta a su equivalente UNC de Windows con `wslpath -w`,
-     que da algo como:
-     \\wsl.localhost\Ubuntu\home\candidate\mi_proyecto_gemini\work\CV_xxx.docx
-     (esto es automático, no importa tu usuario ni el nombre de la distro).
-  3. Ejecutamos `powershell.exe` (accesible desde WSL por la interop nativa)
-     apuntando a un script .ps1 que vive en Windows (C:\Scripts\word_to_pdf.ps1
-     por defecto, configurable con la env var WORD_TO_PDF_SCRIPT).
-  4. Ese script abre Word en segundo plano, hace SaveAs a PDF, cierra Word.
-  5. Como la ruta de salida también es la UNC de la MISMA carpeta de WSL,
-     el PDF queda escrito directamente donde Python lo espera, sin copiar
-     nada a mano.
-
-Requisitos en Windows (una sola vez):
-  1. Crear la carpeta C:\Scripts
-  2. Guardar ahí word_to_pdf.ps1 con este contenido:
-
-     param(
-         [string]$DocxPath,
-         [string]$PdfPath
-     )
-     $word = New-Object -ComObject Word.Application
-     $word.Visible = $false
-     $doc = $word.Documents.Open($DocxPath)
-     $wdFormatPDF = 17
-     $doc.SaveAs([ref]$PdfPath, [ref]$wdFormatPDF)
-     $doc.Close()
-     $word.Quit()
-     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($doc) | Out-Null
-     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($word) | Out-Null
-
-  3. Tener Microsoft Word instalado en Windows (con licencia activa).
-  4. Interop de WSL habilitado (viene activado por defecto; permite llamar
-     powershell.exe desde Ubuntu).
-
-Variables de entorno opcionales:
-  WORD_TO_PDF_SCRIPT   Ruta Windows del .ps1 (default: C:\\Scripts\\word_to_pdf.ps1)
-  PDF_ENGINE            "word" (default) o "libreoffice" como fallback si
-                        corres esto en un Ubuntu sin acceso a Windows/Word
-                        (ej. un servidor Linux puro, sin WSL).
+Word usa el script incluido scripts/word_to_pdf.ps1. wslpath convierte las
+rutas del documento, PDF y script a rutas Windows; no hace falta crear
+C:\Scripts. Se requiere Microsoft Word instalado en Windows e interop WSL.
+WORD_TO_PDF_SCRIPT permite indicar un script Windows propio; vacío usa el
+script incluido. PDF_ENGINE=libreoffice activa el motor alternativo.
 """
 
 import os
@@ -64,7 +19,8 @@ OUTPUT_DIR = Path("output_pdfs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 PDF_ENGINE = os.environ.get("PDF_ENGINE", "word").strip().lower()
-WORD_TO_PDF_SCRIPT = os.environ.get("WORD_TO_PDF_SCRIPT", r"C:\Scripts\word_to_pdf.ps1")
+WORD_TO_PDF_SCRIPT = os.environ.get("WORD_TO_PDF_SCRIPT", "").strip()
+BUNDLED_WORD_SCRIPT = Path(__file__).resolve().parent / "scripts" / "word_to_pdf.ps1"
 
 # Words/markers that should not create meaningless filename initials.
 _PDF_TITLE_STOPWORDS = {
@@ -111,12 +67,13 @@ def docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> None:
     """Convierte docx -> pdf abriendo Word REAL en Windows desde WSL."""
     windows_docx = _wsl_to_windows_path(docx_path)
     windows_pdf = _wsl_to_windows_path(pdf_path)
+    script = WORD_TO_PDF_SCRIPT or _wsl_to_windows_path(str(BUNDLED_WORD_SCRIPT))
 
     subprocess.run(
         [
             "powershell.exe",
             "-ExecutionPolicy", "Bypass",
-            "-File", WORD_TO_PDF_SCRIPT,
+            "-File", script,
             "-DocxPath", windows_docx,
             "-PdfPath", windows_pdf,
         ],
@@ -128,7 +85,7 @@ def docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> None:
         raise RuntimeError(
             f"Word no generó el PDF esperado en {pdf_path} "
             f"(docx enviado: {windows_docx}, pdf esperado: {windows_pdf}). "
-            f"Revisa que Word esté instalado y que {WORD_TO_PDF_SCRIPT} "
+            f"Revisa que Word esté instalado y que {script} "
             f"exista en Windows."
         )
 

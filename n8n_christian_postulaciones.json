@@ -202,8 +202,8 @@
       ],
       "notes": "Inicia una búsqueda persistida y devuelve task_id inmediatamente. Reintentos reutilizan la tarea.",
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "maxTries": 5,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -352,7 +352,7 @@
         27136,
         -14288
       ],
-      "retryOnFail": true,
+      "retryOnFail": false,
       "continueOnFail": true,
       "notes": "Crea CV/DOCX/PDF reutilizando job_text del paso anterior para evitar re-scraping. Timeout 20 min porque Gemini + Word/PDF puede tardar mas de 5 min."
     },
@@ -409,7 +409,7 @@
         27744,
         -14128
       ],
-      "retryOnFail": true,
+      "retryOnFail": false,
       "continueOnFail": true,
       "notes": "Reintenta solo este nodo si falla Playwright/CAPTCHA/ATS. Reutiliza pdf_path creado por el nodo anterior."
     },
@@ -595,7 +595,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { row: {\"real_apply_url\": ($json.real_apply_url || $json.url), \"Status\": (\"failed\"), \"reason\": ($json.error)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+        "jsonBody": "={{ { row: { real_apply_url: $(\"Releer estado en vivo\").item.json.real_apply_url, Status: \"failed\", reason: $json.error?.message || JSON.stringify($json.error || $json) }, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
       },
       "id": "6de6042c-8313-439e-8b63-9922504561cb",
       "name": "Marcar Create PDF Failed",
@@ -654,7 +654,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { row: {\"real_apply_url\": ($json.real_apply_url || $json.url), \"Status\": (\"failed\"), \"autofill\": ($json.error)}, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
+        "jsonBody": "={{ { row: { real_apply_url: $(\"PDF Ready? (PRO)\").item.json.real_apply_url, Status: \"failed\", autofill: $json.error?.message || JSON.stringify($json.error || $json) }, matching_columns: [\"real_apply_url\"], preserve_existing: false } }}"
       },
       "id": "98bd949a-49bf-4e60-9d42-ed1d675a5e15",
       "name": "Marcar Autofill Failed",
