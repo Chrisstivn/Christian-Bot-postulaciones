@@ -549,6 +549,23 @@ def _estimated_bullet_lines(task: str) -> int:
     )
 
 
+def _people_management_claim(text: str) -> bool:
+    value = (text or '').lower()
+    return bool(re.search(
+        r"\b(?:lider\w*|dirig\w*|supervis\w*|jefatur\w*)\b[^.!?;]{0,100}\b(?:equipos?|personas?|personal|colaboradores?)\b"
+        r"|\b(?:equipos?|personas?|personal|colaboradores?)\b[^.!?;]{0,60}\b(?:a cargo|bajo mi|liderazgo)\b"
+        r"|\b(?:gesti[oó]n|manejo) de (?:personas|personal|equipos)\b", value))
+
+
+def _task_problems(task):
+    problems = _bullet_style_problems(task)
+    if not 140 <= len(task.strip()) <= 200:
+        problems.append('longitud fuera de 140-200')
+    if _estimated_bullet_lines(task) > 2:
+        problems.append('más de dos líneas')
+    return problems
+
+
 def _bullet_style_problems(text: str) -> list[str]:
     problems: list[str] = []
     bullet = (text or "").strip()
@@ -563,6 +580,8 @@ def _bullet_style_problems(text: str) -> list[str]:
             f"termina en palabra colgante/incompleta ('{words[-1]}')"
         )
 
+    if _people_management_claim(bullet):
+        problems.append('atribuye liderazgo de equipos o personas a cargo, prohibido')
     lowered = bullet.lower()
     past_verbs = r"gestioné|lideré|desarrollé|implementé|coordiné|analicé|administré|planifiqué|supervisé|optimicé|identifiqué|automaticé|elaboré|controlé|realicé|aseguré|monitoreé|evalué|participé|colaboré|apoyé"
     if re.search(rf"\b(?:{past_verbs})\b", lowered):
@@ -595,6 +614,8 @@ def _validate_adaptation(adaptation: "CVAdaptation") -> list[str]:
     de la coma (45 caracteres)."""
     problems = []
 
+    if _people_management_claim(adaptation.nuevo_perfil):
+        problems.append('nuevo_perfil atribuye liderazgo de equipos o personas a cargo, prohibido')
     profile_len = len(adaptation.nuevo_perfil)
     if not (555 <= profile_len <= 635):
         problems.append(
@@ -855,6 +876,11 @@ Devuelve SOLO este JSON, sin texto adicional:
 
 
 CV_OUTPUT_CHECKLIST = """
+PROHIBICIÓN EXPRESA DEL CANDIDATO:
+En nuevo_perfil y nuevas_tareas NUNCA atribuyas liderazgo de equipos, personal,
+subordinados ni personas a cargo, aunque el maestro o la oferta lo sugieran.
+Puedes describir coordinación con áreas, clientes y proveedores sin autoridad
+jerárquica. Tampoco conviertas coordinación de proyectos en liderazgo de personas.
 COMPROBACIÓN FINAL OBLIGATORIA ANTES DE EMITIR EL JSON:
 Aplica solo a los campos solicitados. No añadas comentarios ni claves nuevas.
 Cuenta caracteres INCLUYENDO espacios y puntuación en el texto final.
@@ -895,12 +921,18 @@ def _accept_valid_cv_replacements(adaptation, raw, keys):
                 if not isinstance(value, list) or len(value) != 4 or not all(isinstance(t, str) for t in value):
                     continue
                 value = [t.strip() for t in value]
+                if len(adaptation.nuevas_tareas) == 4:
+                    invalid = [i for i,t in enumerate(adaptation.nuevas_tareas) if _task_problems(t)]
+                    if not invalid and not 700 <= sum(len(t) for t in adaptation.nuevas_tareas) <= 800:
+                        invalid = [min(range(4), key=lambda i: len(adaptation.nuevas_tareas[i]))]
+                    value = [value[i] if i in invalid and not _task_problems(value[i])
+                             else adaptation.nuevas_tareas[i] for i in range(4)]
             elif isinstance(value, str):
                 value = value.strip()
             else:
                 continue
             trial = CVAdaptation.model_validate({**adaptation.model_dump(), key: value})
-            if not _cv_field_problems(trial, key):
+            if key == 'nuevas_tareas' or not _cv_field_problems(trial, key):
                 adaptation = trial
                 break
     return adaptation
@@ -921,7 +953,7 @@ def _repair_invalid_cv_fields_with_gemini(
     payload_lines: list[str] = []
 
     profile_len = len(adaptation.nuevo_perfil.strip())
-    if not (555 <= profile_len <= 635):
+    if not (555 <= profile_len <= 635) or _people_management_claim(adaptation.nuevo_perfil):
         invalid_fields.append(
             f'nuevo_perfil is {profile_len} characters. Rewrite it to 585-610 '
             'characters so it safely fits the allowed 555-635 range. Keep the '
@@ -991,7 +1023,8 @@ def _repair_invalid_cv_fields_with_gemini(
 
     if bullet_problems:
         invalid_fields.append(
-            "Rewrite all four nuevas_tareas. Each must be a complete natural "
+            "Return the four nuevas_tareas in the same order but rewrite ONLY invalid bullets. "
+            "Copy valid bullets exactly, without changing a character. Each must be a complete natural "
             "first-person present-tense sentence, preferably 175-185 characters, and EACH "
             "must fit in at most TWO visual lines. The four combined must "
             "still be 700-800 characters and none may use: orchestrated, engineered, "
@@ -1081,11 +1114,12 @@ def _stable_cv_repair_pass(
     if not problems:
         return adaptation
 
-    return _repair_invalid_cv_fields_with_gemini(
-        adaptation,
-        job_description_text,
-        source_context,
-    )
+    for _ in range(4):
+        adaptation = _repair_invalid_cv_fields_with_gemini(
+            adaptation, job_description_text, source_context)
+        if not _validate_adaptation(adaptation):
+            break
+    return adaptation
 
 
 def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: CandidateBible | None = None) -> CVAdaptation:
@@ -1126,6 +1160,10 @@ def adapt_cv(cv_maestro_text: str, job_description_text: str, candidate_bible: C
     )
     raw = _call_gemini_json(CV_ADAPTATION_SYSTEM_PROMPT + CV_OUTPUT_CHECKLIST, retry_content)
     regenerated = CVAdaptation.model_validate(raw)
+    if len(adaptation.nuevas_tareas) == len(regenerated.nuevas_tareas) == 4:
+        for i, task in enumerate(adaptation.nuevas_tareas):
+            if not _task_problems(task):
+                regenerated.nuevas_tareas[i] = task
     # A full fallback must not regress fields already satisfying the layout.
     for key in ('nuevo_perfil', 'nuevo_titulo', 'nuevo_cargo_actual', 'nuevas_tareas'):
         if not _cv_field_problems(adaptation, key):

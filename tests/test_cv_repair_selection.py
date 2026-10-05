@@ -13,6 +13,37 @@ def draft(profile='P' * 600):
 
 
 class RepairSelectionTests(unittest.TestCase):
+    def test_only_failed_bullet_retries_and_valid_bullets_are_frozen(self):
+        original = draft()
+        original.nuevas_tareas[0] = 'Gestiono los plazos o.'
+        frozen = original.nuevas_tareas[1:].copy()
+        bad = draft().nuevas_tareas.copy(); bad[0] = 'Gestiono los plazos o.'
+        good = draft().nuevas_tareas.copy()
+        good[1:] = ['Coordino ' + 'b' * 165 + '.' for _ in range(3)]
+        with patch.object(service, '_estimated_title_lines', return_value=2), \
+             patch.object(service, '_estimated_bullet_lines', return_value=2), \
+             patch.object(service, '_call_gemini_json', side_effect=[
+                 {'nuevas_tareas': bad}, {'nuevas_tareas': good}]) as llm:
+            result = service._stable_cv_repair_pass(original,'Job','Source')
+        self.assertEqual(llm.call_count,2)
+        self.assertEqual(result.nuevas_tareas[1:],frozen)
+        self.assertEqual(result.nuevas_tareas[0],good[0])
+
+    def test_people_management_is_rejected_but_coordination_is_allowed(self):
+        for text in ['Lidero equipos multidisciplinarios.', 'Lideré la coordinación de equipos.',
+                     'Tengo personal a cargo.', 'Superviso personas del área.']:
+            self.assertTrue(service._people_management_claim(text),text)
+        self.assertFalse(service._people_management_claim('Coordino actividades con clientes, proveedores y áreas internas.'))
+        a=draft('Ingeniero con equipos a cargo. ' + 'P'*560)
+        self.assertTrue(any('liderazgo' in p for p in service._validate_adaptation(a)))
+
+    def test_failed_targeted_repair_has_bounded_retry_budget(self):
+        a=draft('P'*486)
+        with patch.object(service,'_call_gemini_json',return_value={'nuevo_perfil':'P'*486}) as llm:
+            result=service._stable_cv_repair_pass(a,'Job','Source')
+        self.assertEqual(llm.call_count,4)
+        self.assertEqual(len(result.nuevo_perfil),486)
+
     def test_incomplete_spanish_title_is_rejected(self):
         self.assertTrue(service._title_style_problems('Ingeniero de Planificación y Control de'))
         self.assertFalse(service._title_style_problems('Ingeniero de Planificación y Control'))
