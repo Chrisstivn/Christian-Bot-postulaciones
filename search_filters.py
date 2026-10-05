@@ -109,6 +109,19 @@ def evaluate(*, company: str, job_title: str, job_text: str,
     raw = raw if isinstance(raw, dict) else {}
     title = norm(job_title)
     rejected, unknown = [], []
+    if re.search(r'\bnegratin\b', norm(company)):
+        rejected.append('excluded_company')
+    education_lines = [norm(line) for line in re.split(r'\n|;', job_text)
+        if re.search(r'\b(?:ingenieria|ingeniero|ingeniera|ing\.?|civil industrial)\b', norm(line))]
+    industrial = r'\b(?:ing(?:enieria|enier[oa])?\.?\s+(?:civil\s+)?industrial|civil\s+industrial)\b'
+    if not any(re.search(industrial, line) for line in education_lines):
+        # Other careers with "similar/afín" need confirmation of eligibility.
+        degree_lines = [line for line in education_lines if re.search(
+            r'\b(?:titulo|titulado|formacion|estudios|carrera|requisito|degree|ingenieria|ing\.)\b', line)]
+        if degree_lines and not any(re.search(r'\b(?:afin|afines|similar|similares|equivalente)\b', line) for line in degree_lines):
+            rejected.append('incompatible_education')
+        else:
+            unknown.append('industrial_engineering_education_unconfirmed')
     if re.search(r'\b(?:practica(?:s|ntes?)?|pasantia|pasante|intern(?:ship)?|becari[oa])\b', title):
         rejected.append('internship')
     if re.search(r'\b(?:director(?:a)?|gerente(?:s)?|subgerente|gerencia|vice[ -]?president[ea]?|vp|svp|evp|general manager|managing director)\b|\bv\.?\s*p\.(?:\s|$)', title):
@@ -149,14 +162,14 @@ def evaluate(*, company: str, job_title: str, job_text: str,
     quote = exp.get('evidence', '')
     scanned = description_required_years(job_text)
     years = scanned[0] if scanned else None
-    if scanned and (years > 4 or (years == 4 and scanned[1])):
-        rejected.append('requires_more_than_four_years')
+    if scanned and (years > 3 or (years == 3 and scanned[1])):
+        rejected.append('requires_more_than_three_years')
     if quote and norm(quote) in norm(job_text):
         parsed = required_years(quote)
         if parsed:
             years, strict = parsed
-            if years > 4 or (years == 4 and strict):
-                rejected.append('requires_more_than_four_years')
+            if years > 3 or (years == 3 and strict):
+                rejected.append('requires_more_than_three_years')
         elif exp.get('minimum_years') is not None and not re.search(
                 r'\b(?:deseable|ideal|preferible|preferred|preferably|nice to have)\b', norm(quote)):
             unknown.append('experience_evidence_unverified')

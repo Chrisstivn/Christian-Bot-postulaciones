@@ -25,10 +25,15 @@ def recheck_row(row, existing):
         raise ValueError('No hay descripción guardada; se conserva la fila.')
     comparison = existing.get('baseline_comparison') or {}
     facts = comparison.get('filter_facts', {}).get('evidence', {})
+    preliminary = search_filters.evaluate(company=existing.get('company') or row.get('company', ''),
+        job_title=existing.get('job_title') or row.get('job_title', ''), job_text=text,
+        work_format=existing.get('work_format') or row.get('Format') or 'Unknown', evidence=facts)
+    if preliminary.decision == search_filters.REJECT:
+        return preliminary
     company_text = ''
     # Reject mandatory experience first, without another network/Gemini request.
     years = search_filters.description_required_years(text)
-    over_limit = years and (years[0] > 4 or (years[0] == 4 and years[1]))
+    over_limit = years and (years[0] > 3 or (years[0] == 3 and years[1]))
     if not over_limit:
         try:
             html = scraper._fetch_linkedin_guest_job_html(row['Link'])

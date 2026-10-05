@@ -24,7 +24,7 @@ class RecheckTests(unittest.TestCase):
     def test_dry_run_never_writes_queue_or_workbook(self):
         with patch.object(recheck.excel_output, 'read_rows', return_value=[{'Link': 'x', 'Status': 'NEW'}]), \
              patch.object(recheck.queue_service, 'get_by_url', return_value={'status': 'ready_for_review'}), \
-             patch.object(recheck, 'recheck_row', return_value=recheck.search_filters.SearchDecision('REJECT', ['requires_more_than_four_years'], {})), \
+             patch.object(recheck, 'recheck_row', return_value=recheck.search_filters.SearchDecision('REJECT', ['requires_more_than_three_years'], {})), \
              patch.object(recheck.queue_service, 'upsert_triage_result') as db, \
              patch.object(recheck.excel_output, 'write_row') as excel:
             self.assertEqual(recheck.run()['REJECT'], 1)

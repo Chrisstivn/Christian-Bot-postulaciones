@@ -179,7 +179,7 @@ actuales del flujo de Christian son las de `test_christian*`,
 
 Los años obligatorios se comprueban también en la descripción completa,
 independientemente de la cita seleccionada por Gemini. Un requisito de más de
-cuatro años se descarta incluso en minería. La preferencia por un sector
+tres años se descarta incluso en minería. La preferencia por un sector
 (por ejemplo, «15 años de experiencia, preferentemente minería») no convierte
 los años en deseables. Se mantienen los mínimos de rangos como 3–5 años.
 
@@ -205,3 +205,9 @@ DISCARDED. Conserva enlaces, otras columnas y filas ya procesadas. No genera
 PDFs ni envía postulaciones. Sin `--apply` muestra resultados sin guardar,
 aunque puede hacer consultas públicas y llamadas a Gemini. Reinicia el backend
 con el nuevo código antes de reanudar n8n. El JSON del workflow no cambia.
+
+La política actual exige un mínimo obligatorio de experiencia de 3 años o menos
+y estudios que acepten Ingeniería Civil Industrial o Ingeniería Industrial.
+Se reconocen tildes y abreviaturas (Ing., Ing Civil Industrial, Civil Industrial).
+Una carrera distinta con «afín/similar» queda pendiente si no se confirma
+compatibilidad. Negratín se excluye explícitamente por preferencia del candidato.

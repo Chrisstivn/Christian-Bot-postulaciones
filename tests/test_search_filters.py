@@ -11,11 +11,11 @@ import job_quality
 from test_christian_search import load_pipeline_functions
 
 TEXT = ('Somos una empresa multinacional mediana con operaciones en varios países. '
-        'Sector de tecnología, trabajo híbrido. Requisito: 4 años de experiencia.')
-MINING = 'Empresa minera chilena mediana, operación en faena presencial y exclusivamente en Chile.'
+        'Sector de tecnología, trabajo híbrido. Requisito: 3 años de experiencia. Estudios: Ingeniería Civil Industrial.')
+MINING = 'Empresa minera chilena mediana, operación en faena presencial y exclusivamente en Chile. Estudios: Ing. Industrial.'
 
 
-def evidence(text=TEXT, mining='NO', size='MEDIUM_OR_LARGE', multi='YES', years=4, quote=None):
+def evidence(text=TEXT, mining='NO', size='MEDIUM_OR_LARGE', multi='YES', years=3, quote=None):
     return {'mining': {'value': mining, 'evidence': text},
             'company_size': {'value': size, 'evidence': text},
             'multinational': {'value': multi, 'evidence': text},
@@ -24,6 +24,21 @@ def evidence(text=TEXT, mining='NO', size='MEDIUM_OR_LARGE', multi='YES', years=
 
 
 class FilterPolicyTests(unittest.TestCase):
+    def test_current_three_year_limit_and_education_variants(self):
+        for career in ('ingeniería civil industrial', 'ing civil industrial', 'civil industrial',
+                       'Ing. Industrial', 'INGENIERIA INDUSTRIAL'):
+            text = 'Requisito: ' + career + '. Experiencia mínima de 3 años.'
+            self.assertEqual(self.decide(text=text, facts=evidence(text, years=3)).decision, 'KEEP')
+        text = TEXT + '\nRequisitos: 4 años de experiencia.'
+        self.assertIn('requires_more_than_three_years', self.decide(text=text, facts=evidence(text, years=None, quote='')).reasons)
+
+    def test_excluded_company_and_incompatible_or_ambiguous_studies(self):
+        result = search_filters.evaluate(company='Negratín Global Services', job_title='Engineer', job_text=TEXT, evidence=evidence(), work_format='Hybrid')
+        self.assertIn('excluded_company', result.reasons)
+        for text, expected in (('Título en Ingeniería Geotécnica', 'REJECT'),
+                               ('Título en Ingeniería Geotécnica o carrera afín', 'REVIEW'),
+                               ('Estudios no informados', 'REVIEW')):
+            self.assertEqual(self.decide(text=text, facts=evidence(text, years=None)).decision, expected)
     def decide(self, title='Project Manager', text=TEXT, work='Hybrid', facts=None):
         return search_filters.evaluate(company='Example', job_title=title, job_text=text,
                     work_format=work, evidence=facts if facts is not None else evidence(text))
@@ -76,9 +91,9 @@ class FilterPolicyTests(unittest.TestCase):
         self.assertEqual(self.decide(facts=facts).decision,'REVIEW')
 
     def test_experience_ranges_preferred_and_strict_thresholds(self):
-        cases={'Mínimo 4 años de experiencia.':'KEEP', 'Requisitos: 5+ años de experiencia.':'REJECT',
+        cases={'Mínimo 3 años de experiencia.':'KEEP', 'Requisitos: 5+ años de experiencia.':'REJECT',
                'Experiencia de 3 a 5 años.':'KEEP', 'Experiencia de 3–5 años.':'KEEP',
-               'Más de 4 años de experiencia.':'REJECT', 'Al menos cinco años de experiencia.':'REJECT',
+               'Más de 3 años de experiencia.':'REJECT', 'Al menos cinco años de experiencia.':'REJECT',
                '5 years of experience preferred.':'KEEP', 'Deseable: 6 años de experiencia.':'KEEP',
                'More than four years of experience.':'REJECT',
                'Requisito: 5 años de experiencia; deseable 6 años.':'REJECT'}
@@ -91,7 +106,7 @@ class FilterPolicyTests(unittest.TestCase):
     def test_mining_still_excludes_more_than_four_years(self):
         text=MINING+' Requisito: 5 años de experiencia.'
         result=self.decide(text=text,work='On-site',facts=evidence(text,mining='YES',multi='NO',years=5))
-        self.assertIn('requires_more_than_four_years',result.reasons)
+        self.assertIn('requires_more_than_three_years',result.reasons)
 
     def test_complete_description_catches_requirement_omitted_by_model(self):
         text = MINING + '\nLo Que Requerimos\nMás de 15 años de experiencia geotécnica y en relaves, preferentemente minería'
@@ -101,11 +116,11 @@ class FilterPolicyTests(unittest.TestCase):
 
     def test_preferred_section_and_company_age_are_not_requirements(self):
         text = TEXT + '\nEmpresa con 40 años de trayectoria.\nDeseable:\n6 años de experiencia en minería\nBeneficios\nSeguro de salud'
-        self.assertEqual(self.decide(text=text, facts=evidence(text, quote='Requisito: 4 años de experiencia.')).decision, 'KEEP')
-        for history in ('Somos redbee, una empresa con más de 14 años de experiencia.',
+        self.assertEqual(self.decide(text=text, facts=evidence(text, quote='Requisito: 3 años de experiencia. Estudios: Ingeniería Civil Industrial.')).decision, 'KEEP')
+        for history in ('Somos redbee, una empresa con más de 13 años de experiencia.',
                         'Con más de 40 años de experiencia, nos hemos consolidado como empresa.',
                         'Example is a global company with 30 years of experience.'):
-            self.assertEqual(search_filters.description_required_years(TEXT + '\n' + history), (4, False))
+            self.assertEqual(search_filters.description_required_years(TEXT + '\n' + history), (3, False))
 
     def test_requirement_section_does_not_need_word_experience_on_each_line(self):
         self.assertEqual(search_filters.description_required_years('Requisitos\n5 años en minería\nBeneficios\nEmpresa con 50 años en el mercado'), (5, False))
@@ -165,7 +180,7 @@ class FilterPipelineTests(unittest.TestCase):
         self.assertIn(profile, self.app['gemini_service'].extract_job_info.call_args.args[0])
         saved = self.app['queue_service'].upsert_triage_result.call_args.kwargs
         self.assertEqual(saved['job_text'], TEXT)
-        self.assertEqual(saved['baseline_comparison']['filter_facts']['minimum_required_years'], 4)
+        self.assertEqual(saved['baseline_comparison']['filter_facts']['minimum_required_years'], 3)
 
     def test_excluded_titles_never_enter_ready_queue(self):
         self.app['gemini_service'].extract_job_info.return_value.job_title='Gerente'
