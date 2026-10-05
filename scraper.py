@@ -7,6 +7,7 @@ Versión optimizada con Stealth para evitar detecciones anti-bot.
 import html as html_lib
 import re
 import threading
+from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -724,6 +725,37 @@ def check_linkedin_application_status(url: str) -> dict:
         "errors": errors[:2],
     }
 
+@lru_cache(maxsize=256)
+def _public_company_text(url: str) -> str:
+    """Bounded, best-effort employer enrichment; failure never approves a job."""
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10, allow_redirects=False)
+        if response.status_code != 200:
+            return ""
+        soup = BeautifulSoup(response.text, "html.parser")
+        about = soup.select_one('section[data-test-id="about-us"]')
+        if about is None:
+            return ""
+        return about.get_text(separator="\n", strip=True)[:12000]
+    except requests.RequestException:
+        return ""
+
+
+def linkedin_company_text(html: str) -> str:
+    """Only follow the employer link in the verified job's company top card."""
+    soup = BeautifulSoup(html, "html.parser")
+    link = soup.select_one('a.topcard__org-name-link')
+    if not link:
+        return ""
+    parts = urlsplit(link.get('href', ''))
+    if (parts.scheme != 'https' or not parts.hostname or
+            not (parts.hostname == 'linkedin.com' or parts.hostname.endswith('.linkedin.com')) or
+            not re.fullmatch(r'/company/[a-zA-Z0-9%_-]+/?', parts.path)):
+        return ""
+    url = urlunsplit(('https', 'www.linkedin.com', parts.path.rstrip('/'), '', ''))
+    return _public_company_text(url)
+
+
 def scrape_job_posting(url: str) -> dict:
     """
     Punto de entrada único. Devuelve el texto y metadata determinística.
@@ -830,4 +862,5 @@ def scrape_job_posting(url: str) -> dict:
     clean_text = text.strip()
     if work_format == "Unknown":
         work_format = extract_work_format(clean_text)
-    return {"text": clean_text, "work_format": work_format}
+    company_text = linkedin_company_text(raw_html) if _is_linkedin_job_url(url) else ""
+    return {"text": clean_text, "work_format": work_format, "company_text": company_text}

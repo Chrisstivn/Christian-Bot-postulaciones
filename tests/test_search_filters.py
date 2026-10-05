@@ -93,6 +93,33 @@ class FilterPolicyTests(unittest.TestCase):
         result=self.decide(text=text,work='On-site',facts=evidence(text,mining='YES',multi='NO',years=5))
         self.assertIn('requires_more_than_four_years',result.reasons)
 
+    def test_complete_description_catches_requirement_omitted_by_model(self):
+        text = MINING + '\nLo Que Requerimos\nMás de 15 años de experiencia geotécnica y en relaves, preferentemente minería'
+        result = self.decide(text=text, work='Hybrid', facts=evidence(text, mining='YES', years=None, quote=''))
+        self.assertEqual(result.decision, 'REJECT')
+        self.assertEqual(result.facts['minimum_required_years'], 15)
+
+    def test_preferred_section_and_company_age_are_not_requirements(self):
+        text = TEXT + '\nEmpresa con 40 años de trayectoria.\nDeseable:\n6 años de experiencia en minería\nBeneficios\nSeguro de salud'
+        self.assertEqual(self.decide(text=text, facts=evidence(text, quote='Requisito: 4 años de experiencia.')).decision, 'KEEP')
+        for history in ('Somos redbee, una empresa con más de 14 años de experiencia.',
+                        'Con más de 40 años de experiencia, nos hemos consolidado como empresa.',
+                        'Example is a global company with 30 years of experience.'):
+            self.assertEqual(search_filters.description_required_years(TEXT + '\n' + history), (4, False))
+
+    def test_requirement_section_does_not_need_word_experience_on_each_line(self):
+        self.assertEqual(search_filters.description_required_years('Requisitos\n5 años en minería\nBeneficios\nEmpresa con 50 años en el mercado'), (5, False))
+        self.assertEqual(search_filters.description_required_years('We are seeking an engineer with 5 years of experience.'), (5, False))
+
+    def test_profile_evidence_resolves_size_without_using_profile_experience(self):
+        profile = 'Company size: 201-500 employees. Multinacional. Nuestro equipo tiene 20 años de experiencia.'
+        facts = evidence()
+        facts['company_size']['evidence'] = '201-500 employees'
+        facts['multinational']['evidence'] = 'Multinacional'
+        result = search_filters.evaluate(company='Example', job_title='Engineer', job_text=TEXT,
+                work_format='Hybrid', evidence=facts, company_text=profile)
+        self.assertEqual(result.decision, 'KEEP')
+
     def test_default_policy_is_active_without_env_configuration(self):
         with patch.dict(os.environ, {'SEARCH_POLICY':'christian','SEARCH_EXCLUDED_TITLE_REGEX':'',
              'SEARCH_ALLOWED_WORK_FORMATS':'','SEARCH_EXCLUDED_CONTRACT_TYPES':''}):
@@ -125,6 +152,20 @@ class FilterPipelineTests(unittest.TestCase):
         result=self.app['_triage_job_url']('https://linkedin.com/jobs/view/1')
         self.assertEqual(result['status'],'review')
         self.assertEqual(self.app['queue_service'].upsert_triage_result.call_args.kwargs['status'],'filter_review')
+
+    def test_employer_profile_is_added_to_extraction_and_checked_separately(self):
+        profile = 'Company size: 201-500 employees. Multinacional. 30 years of experience.'
+        facts = evidence()
+        facts['company_size']['evidence'] = '201-500 employees'
+        facts['multinational']['evidence'] = 'Multinacional'
+        self.app['scraper'].scrape_job_posting.return_value = {'text': TEXT, 'work_format': 'Hybrid', 'company_text': profile}
+        self.app['gemini_service'].extract_job_info.return_value.search_filter_evidence = facts
+        result = self.app['_triage_job_url']('https://linkedin.com/jobs/view/1')
+        self.assertEqual(result['status'], 'ready')
+        self.assertIn(profile, self.app['gemini_service'].extract_job_info.call_args.args[0])
+        saved = self.app['queue_service'].upsert_triage_result.call_args.kwargs
+        self.assertEqual(saved['job_text'], TEXT)
+        self.assertEqual(saved['baseline_comparison']['filter_facts']['minimum_required_years'], 4)
 
     def test_excluded_titles_never_enter_ready_queue(self):
         self.app['gemini_service'].extract_job_info.return_value.job_title='Gerente'

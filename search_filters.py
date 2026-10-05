@@ -52,7 +52,7 @@ def required_years(quote: str):
     if len(clauses) > 1:
         return max((value for clause in clauses if (value := required_years(clause)) is not None), default=None)
     text = norm(quote)
-    if re.search(r"\b(?:deseable|ideal|preferible|preferred|preferably|nice to have|valorara)\b", text):
+    if re.search(r"\b(?:deseable|ideal|preferible|preferred|nice to have|valorara)\b", text):
         return None
     words = {"uno": "1", "un": "1", "dos": "2", "tres": "3", "cuatro": "4",
              "cinco": "5", "seis": "6", "siete": "7", "ocho": "8", "nueve": "9", "diez": "10",
@@ -67,8 +67,43 @@ def required_years(quote: str):
     return max(values, default=None)
 
 
+def description_required_years(text: str):
+    """Inspect experience requirements independently of the model's selected quote.
+
+    'Preferentemente minería' qualifies the sector, not the years required.
+    Optional sections are skipped until a new heading, and company age is ignored.
+    """
+    values = []
+    optional = False
+    requirements = False
+    for line in re.split(r'\n|;|(?<=[.!?])\s+', text):
+        normalized = norm(line)
+        if re.fullmatch(r'(?:deseable[s]?|preferred(?: qualifications)?|nice to have|requisitos deseables)[: ]*', normalized):
+            optional = True
+            continue
+        if re.fullmatch(r'(?:requisitos(?: minimos)?|requirements|qualifications|que buscamos|lo que requerimos)[: ]*', normalized):
+            optional = False
+            requirements = True
+        if re.fullmatch(r'(?:responsibilities|responsabilidades|beneficios|benefits|sobre nosotros|about us|company description)[: ]*', normalized):
+            optional = False
+            requirements = False
+        # Employer history must not be mistaken for candidate experience.
+        if (re.search(r'\b(?:somos|nuestra empresa|nuestro equipo|nos hemos|we have|we are|our company|our team)\b', normalized)
+                and not re.search(r'\b(?:requerimos|buscamos|requiere|requires?|required|seeking|minimum|minim[oa]|debe|must)\b', normalized)):
+            continue
+        if (re.search(r'\b(?:empresa|company|compania|grupo)\b.{0,100}\b\d+\s*(?:anos|years)\b', normalized)
+                and not re.search(r'\b(?:requisito[s]?|requerimos|buscamos|requiere|requires?|required|seeking|minimum|minim[oa]|debe|must)\b', normalized)):
+            continue
+        if optional or (not requirements and not re.search(r'\b(?:experiencia|experience)\b', normalized)):
+            continue
+        parsed = required_years(line)
+        if parsed is not None:
+            values.append(parsed)
+    return max(values, default=None)
+
+
 def evaluate(*, company: str, job_title: str, job_text: str,
-             work_format: str = 'Unknown', evidence=None) -> SearchDecision:
+             work_format: str = 'Unknown', evidence=None, company_text: str = '') -> SearchDecision:
     from job_quality import classify_remote
     raw = evidence.model_dump() if hasattr(evidence, 'model_dump') else evidence
     raw = raw if isinstance(raw, dict) else {}
@@ -79,9 +114,10 @@ def evaluate(*, company: str, job_title: str, job_text: str,
     if re.search(r'\b(?:director(?:a)?|gerente(?:s)?|subgerente|gerencia|vice[ -]?president[ea]?|vp|svp|evp|general manager|managing director)\b|\bv\.?\s*p\.(?:\s|$)', title):
         rejected.append('excluded_executive_title')
 
-    mining = _evidence_value(raw, 'mining', job_text)
-    size = _evidence_value(raw, 'company_size', job_text)
-    multinational = _evidence_value(raw, 'multinational', job_text)
+    company_source = job_text + '\n' + company_text
+    mining = _evidence_value(raw, 'mining', company_source)
+    size = _evidence_value(raw, 'company_size', company_source)
+    multinational = _evidence_value(raw, 'multinational', company_source)
     internship = _evidence_value(raw, 'internship', job_text)
     remote = classify_remote(job_text, work_format)
     if internship == 'YES' and 'internship' not in rejected:
@@ -111,7 +147,10 @@ def evaluate(*, company: str, job_title: str, job_text: str,
 
     exp = raw.get('experience', {})
     quote = exp.get('evidence', '')
-    years = None
+    scanned = description_required_years(job_text)
+    years = scanned[0] if scanned else None
+    if scanned and (years > 4 or (years == 4 and scanned[1])):
+        rejected.append('requires_more_than_four_years')
     if quote and norm(quote) in norm(job_text):
         parsed = required_years(quote)
         if parsed:
@@ -128,5 +167,5 @@ def evaluate(*, company: str, job_title: str, job_text: str,
     return SearchDecision(REJECT if rejected else REVIEW if unknown else KEEP, reasons,
         {'company': company, 'company_size': size, 'multinational': multinational,
          'mining': mining, 'remote_status': remote,
-         'minimum_required_years': years if quote and norm(quote) in norm(job_text) else None,
+         'minimum_required_years': max(years or 0, scanned[0]) if scanned else years,
          'evidence': raw})

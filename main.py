@@ -466,7 +466,9 @@ def _triage_job_url(job_url: str) -> dict:
             }
 
     try:
-        job_info = gemini_service.extract_job_info(job_text, include_questions=False, include_search_filters=True)
+        company_text = scraped.get("company_text", "") if isinstance(scraped, dict) else ""
+        extraction_text = job_text + ("\n\nPERFIL PÚBLICO DEL EMPLEADOR (no es la descripción del cargo):\n" + company_text if company_text else "")
+        job_info = gemini_service.extract_job_info(extraction_text, include_questions=False, include_search_filters=True)
     except Exception as e:
         queue_service.upsert_triage_result(
             job_url,
@@ -485,6 +487,7 @@ def _triage_job_url(job_url: str) -> dict:
         job_text=job_text,
         work_format=work_format,
         evidence=getattr(job_info, "search_filter_evidence", None),
+        company_text=company_text,
     )
     filter_decision = upgrade.comparison.get("decision", "KEEP" if upgrade.keep else "REJECT")
 

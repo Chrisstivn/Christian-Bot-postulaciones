@@ -174,3 +174,34 @@ actuales del flujo de Christian son las de `test_christian*`,
 `test_search_filters`, `test_final_qa_regressions`, `test_cv*`,
 `test_linkedin_job_scrape_guard`, `test_job_extraction_shape` y
 `test_excel_output`. Validar Gemini real exige ADC en la laptop.
+
+### Revisión de filtros y filas existentes
+
+Los años obligatorios se comprueban también en la descripción completa,
+independientemente de la cita seleccionada por Gemini. Un requisito de más de
+cuatro años se descarta incluso en minería. La preferencia por un sector
+(por ejemplo, «15 años de experiencia, preferentemente minería») no convierte
+los años en deseables. Se mantienen los mínimos de rangos como 3–5 años.
+
+Cuando la oferta contiene el enlace del empleador, se consulta su sección
+pública About de LinkedIn para aportar evidencia de tamaño y operaciones.
+Cada perfil se consulta una vez por proceso, con timeout de diez segundos y
+sin seguir redirecciones de login. Si LinkedIn bloquea el perfil o la sección
+no contiene el dato, sigue siendo FILTER_REVIEW; no se inventan hechos.
+El perfil no se utiliza para experiencia, cargo ni modalidad del puesto.
+
+Actualizar el código no cambia automáticamente filas ya guardadas. Una vez
+terminada la búsqueda activa, pausa n8n y ejecuta desde el repositorio, con
+el entorno virtual y las mismas variables de entorno del backend:
+
+```bash
+python recheck_search_filters.py --apply
+```
+
+El comando guarda un respaldo junto al Excel antes de actualizar. Revisa solo
+NEW/FILTER_REVIEW cuyo registro de cola sigue en ready_for_review/filter_review.
+Actualiza PostgreSQL y Excel: KEEP → NEW, REVIEW → FILTER_REVIEW y REJECT →
+DISCARDED. Conserva enlaces, otras columnas y filas ya procesadas. No genera
+PDFs ni envía postulaciones. Sin `--apply` muestra resultados sin guardar,
+aunque puede hacer consultas públicas y llamadas a Gemini. Reinicia el backend
+con el nuevo código antes de reanudar n8n. El JSON del workflow no cambia.

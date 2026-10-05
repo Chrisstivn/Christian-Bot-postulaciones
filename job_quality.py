@@ -417,10 +417,11 @@ def evaluate_upgrade(
 def evaluate_search_filters(**kwargs):
     """Apply the current policy; unrestricted mode is an explicit legacy opt-out."""
     evidence = kwargs.pop("evidence", None)
+    company_text = kwargs.pop("company_text", "")
     if os.environ.get("SEARCH_POLICY", "christian").strip().lower() == "unrestricted":
         return evaluate_upgrade(**kwargs)
     from search_filters import evaluate
-    decision = evaluate(**kwargs, evidence=evidence)
+    decision = evaluate(**kwargs, evidence=evidence, company_text=company_text)
     # Preserve additional exclusions only when explicitly configured.
     optional = evaluate_upgrade(**kwargs)
     if not optional.keep:
