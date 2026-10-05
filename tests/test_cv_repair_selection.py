@@ -13,6 +13,8 @@ def draft(profile='P' * 600):
 
 
 class RepairSelectionTests(unittest.TestCase):
+    def test_profile_with_545_characters_does_not_trigger_length_repair(self):
+        self.assertFalse(any(p.startswith('nuevo_perfil tiene') for p in service._validate_adaptation(draft('P'*545))))
     def test_pdf_profile_repair_retries_783_then_preserves_valid_other_field(self):
         original=draft()
         title=original.nuevo_titulo
@@ -52,11 +54,11 @@ class RepairSelectionTests(unittest.TestCase):
         self.assertTrue(any('liderazgo' in p for p in service._validate_adaptation(a)))
 
     def test_failed_targeted_repair_has_bounded_retry_budget(self):
-        a=draft('P'*486)
-        with patch.object(service,'_call_gemini_json',return_value={'nuevo_perfil':'P'*486}) as llm:
+        a=draft('P'*400)
+        with patch.object(service,'_call_gemini_json',return_value={'nuevo_perfil':'P'*400}) as llm:
             result=service._stable_cv_repair_pass(a,'Job','Source')
         self.assertEqual(llm.call_count,4)
-        self.assertEqual(len(result.nuevo_perfil),486)
+        self.assertEqual(len(result.nuevo_perfil),400)
 
     def test_incomplete_spanish_title_is_rejected(self):
         self.assertTrue(service._title_style_problems('Ingeniero de Planificación y Control de'))
@@ -115,7 +117,7 @@ class RepairSelectionTests(unittest.TestCase):
         with patch.object(service, '_estimated_title_lines', return_value=2), \
              patch.object(service, '_estimated_bullet_lines', return_value=2), \
              patch.object(service, '_call_gemini_json', side_effect=[
-                 {'nuevo_perfil': 'P' * 512, 'nuevo_titulo': title},
+                 {'nuevo_perfil': 'P' * 400, 'nuevo_titulo': title},
                  {'nuevo_perfil': 'P' * 570},
              ]) as llm:
             result = service.repair_rendered_cv_layout(original, 'Source facts', 'Job', '',
@@ -126,8 +128,8 @@ class RepairSelectionTests(unittest.TestCase):
         self.assertEqual(llm.call_count, 2)
 
     def test_rendered_layout_repair_still_rejects_invalid_final_response(self):
-        with patch.object(service, '_call_gemini_json', return_value={'nuevo_perfil': 'P' * 512}) as llm:
-            with self.assertRaisesRegex(ValueError, '512 caracteres'):
+        with patch.object(service, '_call_gemini_json', return_value={'nuevo_perfil': 'P' * 400}) as llm:
+            with self.assertRaisesRegex(ValueError, '400 caracteres'):
                 service.repair_rendered_cv_layout(draft(), 'Source facts', 'Job', '', [{'field': 'nuevo_perfil'}])
         self.assertEqual(llm.call_count, 5)
 

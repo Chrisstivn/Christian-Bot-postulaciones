@@ -378,8 +378,8 @@ REGLAS DE NEGOCIO (obligatorias):
    El título debe ser una frase profesional COMPLETA. Nunca puede terminar
    en "de", "del", "para", "en", "con", "&", "and", "or", una coma o cualquier conector colgante. Reescribe la frase completa, nunca la cortes.
 
-2. "nuevo_perfil": un párrafo de EXACTAMENTE 6 líneas (aproximadamente
-   555-635 caracteres en total) que combine la experiencia REAL descrita
+2. "nuevo_perfil": un párrafo de 5 o 6 líneas (aproximadamente
+   450-635 caracteres en total) que combine la experiencia REAL descrita
    en CV_MAESTRO con el lenguaje del puesto al que se postula. Tono
    profesional, "corporate", persuasivo. Puede reformular y enfatizar,
    pero NO puede inventar empresas, títulos universitarios, certificaciones
@@ -610,17 +610,17 @@ def _title_style_problems(text: str) -> list[str]:
 
 def _validate_adaptation(adaptation: "CVAdaptation") -> list[str]:
     """Guardarraíles EN CÓDIGO de las 3 reglas duras que el prompt puede
-    incumplir: largo del perfil (6 líneas) y largo del cargo antes
+    incumplir: largo del perfil (5 o 6 líneas) y largo del cargo antes
     de la coma (45 caracteres)."""
     problems = []
 
     if _people_management_claim(adaptation.nuevo_perfil):
         problems.append('nuevo_perfil atribuye liderazgo de equipos o personas a cargo, prohibido')
     profile_len = len(adaptation.nuevo_perfil)
-    if not (555 <= profile_len <= 635):
+    if not (450 <= profile_len <= 635):
         problems.append(
             f"nuevo_perfil tiene {profile_len} caracteres; debe tener entre "
-            f"555 y 635 (6 líneas completas, ni más corto ni más largo)."
+            f"450 y 635 (5 o 6 líneas completas, ni más corto ni más largo)."
         )
 
     titulo = adaptation.nuevo_titulo.strip()
@@ -733,7 +733,7 @@ def _trim_to_word_budget(text: str, max_chars: int, ensure_period: bool = True) 
     return trimmed or text[:max_chars].strip()
 
 
-def _fit_profile_to_layout(text: str, min_chars: int = 555, max_chars: int = 635) -> str:
+def _fit_profile_to_layout(text: str, min_chars: int = 450, max_chars: int = 635) -> str:
     """Never truncate prose to force layout; Gemini must rewrite it."""
     return re.sub(r"\s+", " ", (text or "").strip())
 
@@ -770,8 +770,8 @@ def _expand_short_profile(
     exacto que una regeneración completa."""
     expand_prompt = """
 Te doy un párrafo de "Personal Profile" para un CV que quedó DEMASIADO
-CORTO. Tu única tarea es expandirlo a exactamente entre 555 y 635
-caracteres (6 líneas completas), agregando más DETALLE sobre la
+CORTO. Tu única tarea es expandirlo a exactamente entre 450 y 635
+caracteres (5 o 6 líneas completas), agregando más DETALLE sobre la
 experiencia real que ya está en CV_MAESTRO y JOB_DESCRIPTION -- nunca
 inventes empresas, títulos, certificaciones, herramientas ni años de
 experiencia que no existan en CV_MAESTRO.
@@ -884,7 +884,7 @@ jerárquica. Tampoco conviertas coordinación de proyectos en liderazgo de perso
 COMPROBACIÓN FINAL OBLIGATORIA ANTES DE EMITIR EL JSON:
 Aplica solo a los campos solicitados. No añadas comentarios ni claves nuevas.
 Cuenta caracteres INCLUYENDO espacios y puntuación en el texto final.
-- nuevo_perfil: objetivo 590-610; límites absolutos 555-635. Si queda corto,
+- nuevo_perfil: objetivo 520-590; límites absolutos 450-635. Si queda corto,
   desarrolla hechos del CV con oraciones completas; si largo, reescribe.
 - nuevo_titulo: objetivo 40-42; límites absolutos 39-45. Frase profesional
   completa relacionada con la oferta. Nunca cortes palabras o ideas.
@@ -953,10 +953,10 @@ def _repair_invalid_cv_fields_with_gemini(
     payload_lines: list[str] = []
 
     profile_len = len(adaptation.nuevo_perfil.strip())
-    if not (555 <= profile_len <= 635) or _people_management_claim(adaptation.nuevo_perfil):
+    if not (450 <= profile_len <= 635) or _people_management_claim(adaptation.nuevo_perfil):
         invalid_fields.append(
-            f'nuevo_perfil is {profile_len} characters. Rewrite it to 585-610 '
-            'characters so it safely fits the allowed 555-635 range. Keep the '
+            f'nuevo_perfil is {profile_len} characters. Rewrite it to 520-590 '
+            'characters so it safely fits the allowed 450-635 range. Keep the '
             'same factual meaning, use complete sentences and end with a period.'
         )
         requested_keys.append("nuevo_perfil")
@@ -1073,7 +1073,7 @@ Mandatory style:
 - Preserve facts already present in the supplied text.
 - Never invent a tool, company, metric, certification or responsibility.
 - Return strict JSON only.
-- Character limits are mandatory: perfil 555-635 (target 585-610),
+- Character limits are mandatory: perfil 450-635 (target 520-590),
   title 39-45, current role before comma at most 45, four bullets 140-200
   each and 700-800 total. Each bullet must fit two visual lines.
 """
@@ -1199,9 +1199,9 @@ Redacta frases naturales y originales según las prioridades de esta oferta;
 no copies frases ni el orden del anuncio, ni una lista genérica de tareas.
 Un título debe expresar una especialización completa; no lo cortes en de o del.
 Mantén título 39-45 caracteres y exactamente 2 líneas contando nombre y |.
-Mantén perfil 555-635 caracteres, oraciones completas y exactamente 6 líneas.
-Si el perfil actual ocupa 7 o más líneas, apunta a 555-580 caracteres y usa
-palabras de ancho menor. Si ocupa menos de 6, desarrolla hechos reales sin
+Mantén perfil 450-635 caracteres, oraciones completas y 5 o 6 líneas.
+Si el perfil actual ocupa 7 o más líneas, apunta a 450-580 caracteres y usa
+palabras de ancho menor. Si ocupa menos de 5, desarrolla hechos reales sin
 superar 635. Nunca lo cortes mecánicamente ni cambies la fuente.
 Tareas: exactamente 4, primera persona del presente, 140-200 cada una y 700-800 en total; máximo 2
 líneas cada una. Usa frases completas. Sin guiones, rayas ni coma antes de y.
@@ -1230,7 +1230,7 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
             + "\n".join(f"- {failure}" for failure in failures)
             + "\nDevuelve SOLO estos campos corregidos: " + json.dumps(invalid_keys)
             + "\nCuenta los caracteres incluidos espacios antes de responder. "
-              "Perfil: apunta a 570 caracteres, nunca menos de 555. "
+              "Perfil: apunta a 570 caracteres, nunca menos de 450. "
               "Reescribe oraciones completas usando solo hechos del maestro."
         )
         correction = _call_gemini_json(prompt + CV_OUTPUT_CHECKLIST, correction_content)

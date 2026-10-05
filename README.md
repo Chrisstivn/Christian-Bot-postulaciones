@@ -100,7 +100,7 @@ laboral, disponibilidad, años totales y preferencias no documentadas quedan
 sin completar y requieren información proporcionada por el candidato.
 
 Gemini genera en español y conserva los límites: título de 39–45 caracteres,
-perfil de 555–635, cuatro tareas de 140–200 cada una y 700–800 en total. La
+perfil de 450–635, cuatro tareas de 140–200 cada una y 700–800 en total. La
 reparación dirigida recibe el CV maestro y la fuente de hechos del candidato,
 además de la oferta. No debe añadir habilidades que solo aparezcan en la oferta.
 La estrategia conserva una generación, reparación dirigida y un único intento
@@ -237,3 +237,5 @@ se verifica en la laptop. Los guardarraíles y la validación PDF siguen activos
 El PDF usa `CV_Christian_Molina_{Empresa}_({InicialesDelRol}).pdf`. Las cuatro tareas del puesto más reciente se redactan en primera persona del presente, según las prioridades de cada oferta y con redacción propia, respaldadas por la experiencia documentada. Los puestos históricos permanecen intactos. Los títulos se reformulan completos; nunca se recortan mecánicamente al límite de caracteres.
 
 Las reparaciones de adaptación realizan hasta cuatro correcciones dirigidas por ronda. Cada bullet válido se conserva exactamente, también en el intento de respaldo; solo se reemplazan bullets inválidos. Sobre mí y las tareas actuales no pueden atribuir liderazgo de equipos ni personas a cargo. Coordinación con áreas, clientes o proveedores está permitida. Si se agotan los intentos sin cumplir, no se entrega el PDF.
+
+Sobre mí acepta cinco o seis líneas reales y entre 450 y 635 caracteres; ya no se fuerza una sexta línea. Se mantiene el máximo para evitar desbordamiento y el PDF debe conservar dos páginas.

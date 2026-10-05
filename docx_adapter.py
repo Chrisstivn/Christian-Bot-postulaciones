@@ -47,12 +47,8 @@ EXPERIENCE_TASK_FONT_SIZE_PT = 10.0
 MAX_PROFILE_CHARS = 635  # CALIBRADO con LibreOffice real sobre este CV:
                           # 643 caracteres todavía da 6 líneas, pero 650 ya
                           # se pasa a 7. Se deja margen de seguridad en 635.
-MIN_PROFILE_CHARS = 555  # CALIBRADO igual: 554 da 6 líneas, 537 ya cae a 5.
-                          # Por debajo de esto, docx_adapter NO puede
-                          # inventar texto para alargarlo sin violar el
-                          # guardarraíl anti-alucinación, así que en vez de
-                          # aceptarlo en silencio, se aborta con un error
-                          # claro (mejor que entregar un CV roto).
+MIN_PROFILE_CHARS = 450  # Rango flexible; el PDF acepta cinco o seis líneas reales.
+
 
 # Estimado para los bullets de "Experience" (mismo tamaño de fuente que el
 # perfil pero con menos ancho disponible por el sangrado de la viñeta). Si
@@ -309,7 +305,7 @@ def update_profile(doc: Document, nuevo_perfil: str) -> None:
         raise ValueError(
             f"nuevo_perfil quedó en {len(perfil_final)} caracteres tras el "
             f"recorte (mínimo {MIN_PROFILE_CHARS}) -> probablemente no llena "
-            f"las 6 líneas. Se aborta antes de generar un CV con el perfil "
+            f"las 5 o 6 líneas. Se aborta antes de generar un CV con el perfil "
             f"corto; revisa el largo que devuelve Gemini."
         )
     # El párrafo del perfil es el primer párrafo NO VACÍO después del heading

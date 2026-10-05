@@ -84,13 +84,19 @@ class RenderedLayoutGuardTests(unittest.TestCase):
             file,a=self.create_pdf(folder,6)
             self.assertEqual(validate_pdf_layout(file,a,'Sample Candidate'),[])
 
+    def test_real_pdf_with_five_profile_lines_passes(self):
+        from pdf_layout_guard import validate_pdf_layout
+        with tempfile.TemporaryDirectory() as folder:
+            file,a=self.create_pdf(folder,5)
+            self.assertEqual(validate_pdf_layout(file,a,'Sample Candidate'),[])
+
     def test_real_pdf_with_seven_profile_lines_triggers_repair(self):
         from pdf_layout_guard import validate_pdf_layout
         with tempfile.TemporaryDirectory() as folder:
             file,a=self.create_pdf(folder,7)
             problems=validate_pdf_layout(file,a,'Sample Candidate')
             self.assertEqual(problems,[{'field':'nuevo_perfil','reason':'rendered_line_count',
-                                       'lines':7,'minimum':6,'maximum':6}])
+                                       'lines':7,'minimum':5,'maximum':6}])
 
     def test_missing_generated_text_fails_closed(self):
         from pdf_layout_guard import validate_pdf_layout

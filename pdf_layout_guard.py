@@ -37,7 +37,7 @@ def validate_pdf_layout(path, adaptation, full_name, expected_pages=None):
     """Return field-specific problems. Unreadable/missing generated text fails closed."""
     problems=[]
     fields=[('nuevo_titulo',full_name+' | '+adaptation.nuevo_titulo,2,2),
-            ('nuevo_perfil',adaptation.nuevo_perfil,6,6)]
+            ('nuevo_perfil',adaptation.nuevo_perfil,5,6)]
     fields += [('nuevas_tareas',task,1,2) for task in adaptation.nuevas_tareas]
     with fitz.open(path) as document:
         if expected_pages is not None:
