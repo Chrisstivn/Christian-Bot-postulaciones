@@ -19,15 +19,17 @@ def _find_lines(document, target):
                 text=_norm(''.join(s['text'] for s in line['spans']))
                 if text:lines.append((text,line['bbox']))
         text=' '.join(line[0] for line in lines)
+        if not target:continue
         start=text.find(target)
-        if start < 0:continue
-        end=start+len(target)
-        offset=0
-        selected=[]
-        for value,box in lines:
-            if offset < end and offset+len(value)>start:selected.append(box)
-            offset+=len(value)+1
-        matches.append((page_number,selected))
+        while start >= 0:
+            end=start+len(target)
+            offset=0
+            selected=[]
+            for value,box in lines:
+                if offset < end and offset+len(value)>start:selected.append(box)
+                offset+=len(value)+1
+            matches.append((page_number,selected))
+            start=text.find(target,end)
     return matches
 
 
@@ -46,6 +48,11 @@ def validate_pdf_layout(path, adaptation, full_name, expected_pages=None):
                 problems.append({'field':'pagination','reason':'experience_overflows_first_page'})
         for field,target,minimum,maximum in fields:
             matches=_find_lines(document,target)
+            # Historical roles can legitimately repeat a current-role bullet.
+            # The adapter always places the current role before historical roles.
+            # Validate its first occurrence, while profile/title stay unique.
+            if field == 'nuevas_tareas' and matches:
+                matches=matches[:1]
             if len(matches)!=1:
                 problems.append({'field':field,'reason':'generated_text_missing_or_duplicated'})
                 continue

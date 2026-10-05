@@ -11,10 +11,12 @@ class SheetPdfNameTests(unittest.TestCase):
         workflow = json.loads(WORKFLOW.read_text(encoding="utf-8-sig"))
         nodes = {node["name"]: node for node in workflow["nodes"]}
         save = nodes["Save Success1"]
-        values = save["parameters"]["columns"]["value"]
-
-        pdf_expr = values["pdf_name"]
-        download_expr = values["download_url"]
+        # Christian writes via the backend HTTP endpoint, rather than Sheets.
+        body = save["parameters"]["jsonBody"]
+        self.assertEqual(save["type"], "n8n-nodes-base.httpRequest")
+        self.assertIn("/excel-output/rows", save["parameters"]["url"])
+        pdf_expr = body.split('"pdf_name":', 1)[1].split('"download_url":', 1)[0]
+        download_expr = body.split('"download_url":', 1)[1].split('"autofill_status":', 1)[0]
 
         self.assertIn("pdf_path", pdf_expr)
         self.assertIn('.split("/").pop()', pdf_expr)

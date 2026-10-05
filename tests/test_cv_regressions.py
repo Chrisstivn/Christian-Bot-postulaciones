@@ -82,6 +82,8 @@ class GeminiTargetedRepairTests(unittest.TestCase):
             "Combines analytical depth with clear stakeholder communication and hands on execution."
         )
         gemini_title = "Senior Product Analytics Data Specialist"
+        # Replacements must satisfy the same minimum as production (555 chars).
+        gemini_profile += " Supports clear reporting and informed decisions for commercial teams."
 
         with patch.object(
             gemini_service,

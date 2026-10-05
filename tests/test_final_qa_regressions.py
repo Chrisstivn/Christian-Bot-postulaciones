@@ -100,6 +100,28 @@ class RenderedLayoutGuardTests(unittest.TestCase):
             self.assertTrue(any(p['reason']=='generated_text_missing_or_duplicated'
                                 for p in validate_pdf_layout(file,a,'Sample Candidate')))
 
+    def test_duplicate_generated_profile_on_same_page_is_rejected(self):
+        import fitz
+        from pdf_layout_guard import validate_pdf_layout
+        with tempfile.TemporaryDirectory() as folder:
+            file,a=self.create_pdf(folder,6)
+            with fitz.open(file) as doc:
+                doc[0].insert_text((70,450), '\n'.join(
+                    f'Perfil de experiencia línea {i}.' for i in range(6)),fontsize=10)
+                doc.saveIncr()
+            self.assertIn({'field':'nuevo_perfil','reason':'generated_text_missing_or_duplicated'},
+                          validate_pdf_layout(file,a,'Sample Candidate'))
+
+    def test_repeated_task_in_historical_role_does_not_reject_current_role(self):
+        import fitz
+        from pdf_layout_guard import validate_pdf_layout
+        with tempfile.TemporaryDirectory() as folder:
+            file,a=self.create_pdf(folder,6)
+            with fitz.open(file) as doc:
+                doc[0].insert_text((70,450),a.nuevas_tareas[0],fontsize=10)
+                doc.saveIncr()
+            self.assertEqual(validate_pdf_layout(file,a,'Sample Candidate'),[])
+
     def test_extra_page_is_rejected_even_if_adapted_fields_fit(self):
         import fitz
         from pdf_layout_guard import validate_pdf_layout
