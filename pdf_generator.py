@@ -49,7 +49,7 @@ def job_title_initials(job_title: str) -> str:
 
 def build_pdf_name(company: str, job_title: str) -> str:
     safe_company = re.sub(r"[^A-Za-z0-9]+", "", company or "") or "Company"
-    return f"CV_Christian_{safe_company}_({job_title_initials(job_title)}).pdf"
+    return f"CV_Christian_Molina_{safe_company}_({job_title_initials(job_title)}).pdf"
 
 
 def _wsl_to_windows_path(wsl_path: str) -> str:
@@ -148,7 +148,7 @@ def build_final_pdf(
     **_ignored,  # acepta y descarta company/job_title/motivation_answer/etc.
 ) -> str:
     """Convierte el CV adaptado a PDF y lo deja en OUTPUT_DIR con el nombre
-    final (CV_Christian_{Company}_{JobTitleInitials}.pdf). Sin páginas extra."""
+    final (CV_Christian_Molina_{Company}_{JobTitleInitials}.pdf). Sin páginas extra."""
     final_path = OUTPUT_DIR / pdf_name
 
     if PDF_ENGINE == "libreoffice":

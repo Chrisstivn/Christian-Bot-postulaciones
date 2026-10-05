@@ -376,7 +376,7 @@ REGLAS DE NEGOCIO (obligatorias):
    acórtalo manteniendo únicamente la parte más importante.
 
    El título debe ser una frase profesional COMPLETA. Nunca puede terminar
-   en "&", "and", "or", una coma o cualquier conector colgante.
+   en "de", "del", "para", "en", "con", "&", "and", "or", una coma o cualquier conector colgante. Reescribe la frase completa, nunca la cortes.
 
 2. "nuevo_perfil": un párrafo de EXACTAMENTE 6 líneas (aproximadamente
    555-635 caracteres en total) que combine la experiencia REAL descrita
@@ -409,11 +409,22 @@ REGLAS DE NEGOCIO (obligatorias):
    Como objetivo práctico, intenta dejar cada bullet alrededor de 175-185
    caracteres, siempre como oración completa.
 
-   TODAS las responsabilidades deben escribirse SIEMPRE en tiempo pasado,
-   utilizando verbos naturales y concretos como "Gestioné", "Lideré", "Desarrollé", "Implementé", "Coordiné" o "Analicé".
-
-   Nunca utilices presente ("Gestiono", "Lidero") ni infinitivos
-   ("Gestionar", "Liderar") o gerundios ("Gestionando", "Liderando").
+   TODAS las responsabilidades del rol más reciente deben escribirse en
+   primera persona del PRESENTE: "Gestiono", "Planifico", "Coordino",
+   "Implemento", "Analizo". No uses pasado ni infinitivos como verbo principal.
+   Prioriza los requisitos y responsabilidades de JOB_DESCRIPTION que estén
+   respaldados por las funciones REALES del rol más reciente en CV_MAESTRO.
+   Redacta desde las prioridades concretas de ESTA oferta, no una lista
+   genérica del CV. Conserva términos técnicos necesarios, pero no copies
+   frases del anuncio ni su orden. Usa lenguaje propio, directo y natural,
+   con cuatro focos diferentes, sin relleno corporativo ni cambios de
+   sinónimos que repitan una misma responsabilidad.
+   La oferta orienta el énfasis, nunca demuestra experiencia del candidato.
+   No atribuyas al rol más reciente funciones que solo aparecen en Volvo u
+   otro cargo histórico. No copies ni parafrasees los bullets de cargos
+   anteriores: cuatro responsabilidades distintas, concretas y pertinentes
+   a esta oferta, sin repetir la misma idea con otros verbos.
+   Conserva íntegros los cargos históricos y las fechas, aunque uses presente.
 
    REGLA DE ESTILO OBLIGATORIA:
    - NO uses estos verbos/palabras en "nuevas_tareas": "orchestrated",
@@ -553,6 +564,9 @@ def _bullet_style_problems(text: str) -> list[str]:
         )
 
     lowered = bullet.lower()
+    past_verbs = r"gestioné|lideré|desarrollé|implementé|coordiné|analicé|administré|planifiqué|supervisé|optimicé|identifiqué|automaticé|elaboré|controlé|realicé|aseguré|monitoreé|evalué|participé|colaboré|apoyé"
+    if re.search(rf"\b(?:{past_verbs})\b", lowered):
+        problems.append("usa pasado; las tareas del último puesto deben estar en presente")
     banned = [
         word for word in _BANNED_CV_BULLET_WORDS
         if re.search(rf"\b{re.escape(word)}\b", lowered)
@@ -569,7 +583,7 @@ def _title_style_problems(text: str) -> list[str]:
     title = (text or "").strip()
     problems: list[str] = []
 
-    if re.search(r"(?:&|\band\b|\bor\b|\by\b|\bo\b|[,;:/])\s*$", title, flags=re.IGNORECASE):
+    if re.search(r"(?:&|\band\b|\bor\b|\by\b|\bo\b|\bde\b|\bdel\b|\bpara\b|\ben\b|\bcon\b|\bel\b|\bla\b|\blos\b|\blas\b|[,;:/])\s*$", title, flags=re.IGNORECASE):
         problems.append("nuevo_titulo termina en un conector o signo colgante")
 
     return problems
@@ -621,6 +635,9 @@ def _validate_adaptation(adaptation: "CVAdaptation") -> list[str]:
             "debe tener máximo 45."
         )
 
+    problems.extend(p.replace('nuevo_titulo', 'nuevo_cargo_actual')
+                    for p in _title_style_problems(cargo_before_comma))
+
     if len(adaptation.nuevas_tareas) != 4:
         problems.append(
             f"nuevas_tareas tiene {len(adaptation.nuevas_tareas)} bullets; "
@@ -661,12 +678,7 @@ def _force_fix_adaptation(adaptation: "CVAdaptation") -> "CVAdaptation":
     cargo = cargo.strip()
     titulo = adaptation.nuevo_titulo.strip()
 
-    if len(titulo) > 45:
-        titulo = titulo[:45].rsplit(" ", 1)[0].strip()
-
     adaptation.nuevo_titulo = titulo
-    if len(cargo) > 45:
-        cargo = cargo[:45].rsplit(" ", 1)[0].rstrip(",;: -–—") or cargo[:45]
     adaptation.nuevo_cargo_actual = f"{cargo}{sep}{resto}" if sep else cargo
 
     perfil = adaptation.nuevo_perfil.strip()
@@ -816,7 +828,7 @@ quede entre 700 y 800 (8 líneas completas combinadas). Nunca inventes
 empresas, tecnologías, certificaciones ni responsabilidades que no
 puedan inferirse razonablemente de CV_MAESTRO.
 
-Todo en español, tiempo pasado ("Gestioné", "Lideré", "Desarrollé"...). Nunca
+Todo en español, primera persona del presente ("Gestiono", "Lidero", "Desarrollo"...). Nunca
 coma antes de "y". Nunca uses guion ni raya. Deben seguir siendo
 EXACTAMENTE 4 bullets. Cada bullet debe ser una oración completa entre
 140 y 200 caracteres; si queda largo, REESCRÍBELO más corto, nunca lo
@@ -921,7 +933,7 @@ def _repair_invalid_cv_fields_with_gemini(
         )
 
     cargo = adaptation.nuevo_cargo_actual.split(",")[0].strip()
-    if len(cargo) > 45:
+    if len(cargo) > 45 or _title_style_problems(cargo):
         invalid_fields.append(
             f'nuevo_cargo_actual before the comma is {len(cargo)} characters. '
             'Rewrite only the role title so it is at most 45 characters.'
@@ -960,7 +972,7 @@ def _repair_invalid_cv_fields_with_gemini(
     if bullet_problems:
         invalid_fields.append(
             "Rewrite all four nuevas_tareas. Each must be a complete natural "
-            "past-tense sentence, preferably 175-185 characters, and EACH "
+            "first-person present-tense sentence, preferably 175-185 characters, and EACH "
             "must fit in at most TWO visual lines. The four combined must "
             "still be 700-800 characters and none may use: orchestrated, engineered, "
             "leveraged, owned, translated, collaborated, defined or drove. "
@@ -994,6 +1006,15 @@ truncate strings mechanically.
 Mandatory style:
 - Spanish only.
 - Natural professional CV language.
+- Write natural, original sentences around this vacancy's concrete priorities.
+  Do not copy vacancy phrases/order or produce generic CV bullets; preserve
+  necessary technical terms. Four distinct focuses, not repeated synonyms.
+- Current-role tasks: first-person PRESENT tense (Gestiono, Planifico, Coordino).
+- Tailor four distinct tasks to JOB_DESCRIPTION using only documented current-role
+  facts. Never borrow a historical role's tasks or reword its bullets. Do not
+  claim an unsupported responsibility just because the vacancy requests it.
+- Titles must express a complete specialization, never end in de, del, para,
+  en, con, y or an unfinished phrase. Rewrite the idea instead of cutting it.
 - No coma justo antes de "y".
 - No hyphen, en dash or em dash in generated prose.
 - Preserve facts already present in the supplied text.
@@ -1114,12 +1135,18 @@ Repara SOLO los campos solicitados de un CV que ya fue renderizado a PDF.
 Devuelve JSON estricto con solo esos campos. Todo en español. Conserva los
 hechos del CV_MAESTRO; no inventes herramientas, logros, años ni funciones.
 No modifiques empresa, fechas, cargo actual ni roles históricos.
+Tareas actuales en presente, primera persona, cuatro ideas distintas orientadas
+al rol solicitado y respaldadas por el rol más reciente del maestro. No copies
+ni parafrasees tareas históricas ni atribuyas a Siemens experiencia de Volvo.
+Redacta frases naturales y originales según las prioridades de esta oferta;
+no copies frases ni el orden del anuncio, ni una lista genérica de tareas.
+Un título debe expresar una especialización completa; no lo cortes en de o del.
 Mantén título 39-45 caracteres y exactamente 2 líneas contando nombre y |.
 Mantén perfil 555-635 caracteres, oraciones completas y exactamente 6 líneas.
 Si el perfil actual ocupa 7 o más líneas, apunta a 555-580 caracteres y usa
 palabras de ancho menor. Si ocupa menos de 6, desarrolla hechos reales sin
 superar 635. Nunca lo cortes mecánicamente ni cambies la fuente.
-Tareas: exactamente 4, pasado, 140-200 cada una y 700-800 en total; máximo 2
+Tareas: exactamente 4, primera persona del presente, 140-200 cada una y 700-800 en total; máximo 2
 líneas cada una. Usa frases completas. Sin guiones, rayas ni coma antes de y.
 No uses orchestrated, engineered, leveraged, owned, translated, collaborated,
 defined ni drove. Estos textos deben caber en las fuentes reales del maestro.

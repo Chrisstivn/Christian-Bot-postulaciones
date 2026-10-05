@@ -8,11 +8,40 @@ def draft(profile='P' * 600):
     return CVAdaptation(nuevo_perfil=profile,
         nuevo_titulo='Ingeniero Proyectos y Mejora de Procesos',
         nuevo_cargo_actual='Ingeniero de Proyectos',
-        nuevas_tareas=['Gestioné ' + 'a' * 165 + '.' for _ in range(4)],
+        nuevas_tareas=['Gestiono ' + 'a' * 165 + '.' for _ in range(4)],
         empresa_actual_sin_cambios='Empresa', fechas_actual_sin_cambios='2024 – 2026')
 
 
 class RepairSelectionTests(unittest.TestCase):
+    def test_incomplete_spanish_title_is_rejected(self):
+        self.assertTrue(service._title_style_problems('Ingeniero de Planificación y Control de'))
+        self.assertFalse(service._title_style_problems('Ingeniero de Planificación y Control'))
+
+    def test_long_title_is_preserved_for_rewrite_instead_of_cutting(self):
+        original = draft()
+        original.nuevo_titulo = 'Ingeniero de Planificación y Control de Proyectos'
+        title = original.nuevo_titulo
+        self.assertEqual(service._force_fix_adaptation(original).nuevo_titulo, title)
+
+    def test_current_tasks_reject_past_and_allow_present(self):
+        self.assertTrue(any('presente' in p for p in service._bullet_style_problems('Desarrollé los cronogramas del proyecto.')))
+        self.assertEqual(service._bullet_style_problems('Desarrollo los cronogramas del proyecto.'), [])
+
+    def test_task_repair_receives_job_specific_original_present_rules(self):
+        original = draft()
+        original.nuevas_tareas[0] = 'Gestioné ' + 'a' * 165 + '.'
+        replacement = draft().nuevas_tareas
+        with patch.object(service, '_estimated_bullet_lines', return_value=2), \
+             patch.object(service, '_call_gemini_json', return_value={'nuevas_tareas': replacement}) as llm:
+            result = service._repair_invalid_cv_fields_with_gemini(original,
+                'Planificación de propuestas y seguimiento de cronogramas', 'Source current and historical roles')
+        prompt, content = llm.call_args.args
+        self.assertIn('PRESENT tense', prompt)
+        self.assertIn('Do not copy vacancy phrases', prompt)
+        self.assertIn('Never borrow a historical', prompt)
+        self.assertIn('Planificación de propuestas', content)
+        self.assertEqual(result.nuevas_tareas, replacement)
+
     def test_rendered_layout_repair_corrects_short_profile_without_overwriting_valid_title(self):
         original = draft()
         title = original.nuevo_titulo
@@ -53,7 +82,7 @@ class RepairSelectionTests(unittest.TestCase):
 
     def test_valid_profile_is_preserved_when_bullet_fallback_regresses_it(self):
         initial = draft()
-        initial.nuevas_tareas[0] = 'Gestioné ' + 'a' * 195 + '.'
+        initial.nuevas_tareas[0] = 'Gestiono ' + 'a' * 195 + '.'
         fallback = draft('X' * 767)
         # Isolate title width; the regression concerns complete profile and bullet groups.
         with patch.object(service, '_estimated_title_lines', return_value=2), \

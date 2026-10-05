@@ -15,14 +15,14 @@ class PdfFilenameTests(unittest.TestCase):
     def test_job_title_initials_are_in_pdf_name(self):
         self.assertEqual(
             pdf_generator.build_pdf_name("Zalando", "Data Analyst Recommerce"),
-            "CV_Christian_Zalando_(DAR).pdf",
+            "CV_Christian_Molina_Zalando_(DAR).pdf",
         )
         self.assertEqual(
             pdf_generator.build_pdf_name(
                 "Workday",
                 "Sr. Reporting & Analytics Consultant (FIN)",
             ),
-            "CV_Christian_Workday_(SRACF).pdf",
+            "CV_Christian_Molina_Workday_(SRACF).pdf",
         )
 
     def test_gender_markers_do_not_pollute_initials(self):
@@ -31,7 +31,7 @@ class PdfFilenameTests(unittest.TestCase):
                 "Yepoda",
                 "Performance Marketing Manager (m/f/d)",
             ),
-            "CV_Christian_Yepoda_(PMM).pdf",
+            "CV_Christian_Molina_Yepoda_(PMM).pdf",
         )
 
 

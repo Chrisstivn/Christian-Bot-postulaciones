@@ -30,7 +30,7 @@ class SheetPdfNameTests(unittest.TestCase):
 
         self.assertEqual(
             pdf_generator.build_pdf_name("Adsquare", "Data Operations Analyst"),
-            "CV_Christian_Adsquare_(DOA).pdf",
+            "CV_Christian_Molina_Adsquare_(DOA).pdf",
         )
 
 

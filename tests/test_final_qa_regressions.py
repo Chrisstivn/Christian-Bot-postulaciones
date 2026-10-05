@@ -69,7 +69,7 @@ class RenderedLayoutGuardTests(unittest.TestCase):
         from types import SimpleNamespace
         doc=fitz.open();page=doc.new_page()
         profile=[f"Perfil de experiencia línea {i}." for i in range(profile_lines)]
-        tasks=[f"Gestioné la actividad {i} del proyecto." for i in range(4)]
+        tasks=[f"Gestiono la actividad {i} del proyecto." for i in range(4)]
         page.insert_text((70,70),"Sample Candidate | Gestión de proyectos\ny mejora de procesos",fontsize=12)
         for i,line in enumerate(profile):page.insert_text((70,130+i*15),line,fontsize=10)
         for i,task in enumerate(tasks):page.insert_text((70,300+i*25),task,fontsize=10)

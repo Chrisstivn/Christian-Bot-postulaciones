@@ -233,3 +233,5 @@ reemplazos que cumplan los límites medidos; no corta frases ni cambia el esquem
 JSON. La regeneración de respaldo conserva campos que ya cumplen sus reglas
 para evitar regresiones. Las pruebas usan respuestas simuladas; Gemini real
 se verifica en la laptop. Los guardarraíles y la validación PDF siguen activos.
+
+El PDF usa `CV_Christian_Molina_{Empresa}_({InicialesDelRol}).pdf`. Las cuatro tareas del puesto más reciente se redactan en primera persona del presente, según las prioridades de cada oferta y con redacción propia, respaldadas por la experiencia documentada. Los puestos históricos permanecen intactos. Los títulos se reformulan completos; nunca se recortan mecánicamente al límite de caracteres.

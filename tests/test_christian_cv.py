@@ -14,15 +14,15 @@ from models import CVAdaptation
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'Christian_CV.docx'
 PROFILE = ('Ingeniero Civil Industrial con experiencia en gestión de proyectos y mejora de procesos. '
-           'Gestioné cronogramas, riesgos y recursos en Acme, coordinando clientes, proveedores y equipos internos para cumplir los plazos, la calidad y el alcance. '
+           'Gestiono cronogramas, riesgos y recursos en Acme, coordinando clientes, proveedores y equipos internos para cumplir los plazos, la calidad y el alcance. '
            'Utilicé indicadores de desempeño para dar seguimiento a los proyectos y apoyar decisiones operacionales. '
            'Mi experiencia en Example Motors incluyó análisis de datos, dashboards y automatización de reportes con Excel y Power BI. '
            'Busco aportar esta base analítica a la coordinación de proyectos y la mejora continua de operaciones.')
 TASKS = [
-    'Gestioné proyectos multidisciplinarios en Acme, coordinando clientes, proveedores y equipos internos de logística, ventas, compras y servicio para cumplir plazos, calidad y alcance.',
-    'Implementé mejoras en los procesos de ejecución de proyectos para optimizar la coordinación entre áreas, dar seguimiento a los compromisos y apoyar el cumplimiento del alcance definido.',
-    'Gestioné cronogramas, riesgos y recursos de los proyectos, utilizando indicadores de desempeño para monitorear avances, detectar desviaciones y apoyar decisiones junto al equipo interno.',
-    'Coordiné equipos multifuncionales y mantuve una comunicación efectiva con clientes, proveedores y áreas internas durante el ciclo de los proyectos para dar seguimiento a plazos y compromisos.',
+    'Gestiono proyectos multidisciplinarios en Acme, coordinando clientes, proveedores y equipos internos de logística, ventas, compras y servicio para cumplir plazos, calidad y alcance.',
+    'Implemento mejoras en los procesos de ejecución de proyectos para optimizar la coordinación entre áreas, dar seguimiento a los compromisos y apoyar el cumplimiento del alcance definido.',
+    'Gestiono cronogramas, riesgos y recursos de los proyectos, utilizando indicadores de desempeño para monitorear avances, detectar desviaciones y apoyar decisiones junto al equipo interno.',
+    'Coordino equipos multifuncionales y mantuve una comunicación efectiva con clientes, proveedores y áreas internas durante el ciclo de los proyectos para dar seguimiento a plazos y compromisos.',
 ]
 
 
