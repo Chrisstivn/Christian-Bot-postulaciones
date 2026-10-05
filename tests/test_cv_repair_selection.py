@@ -13,6 +13,28 @@ def draft(profile='P' * 600):
 
 
 class RepairSelectionTests(unittest.TestCase):
+    def test_rendered_layout_repair_corrects_short_profile_without_overwriting_valid_title(self):
+        original = draft()
+        title = original.nuevo_titulo
+        with patch.object(service, '_estimated_title_lines', return_value=2), \
+             patch.object(service, '_estimated_bullet_lines', return_value=2), \
+             patch.object(service, '_call_gemini_json', side_effect=[
+                 {'nuevo_perfil': 'P' * 512, 'nuevo_titulo': title},
+                 {'nuevo_perfil': 'P' * 570},
+             ]) as llm:
+            result = service.repair_rendered_cv_layout(original, 'Source facts', 'Job', '',
+                [{'field': 'nuevo_perfil'}, {'field': 'nuevo_titulo'}])
+        self.assertEqual(len(result.nuevo_perfil), 570)
+        self.assertEqual(result.nuevo_titulo, title)
+        self.assertEqual(result.empresa_actual_sin_cambios, original.empresa_actual_sin_cambios)
+        self.assertEqual(llm.call_count, 2)
+
+    def test_rendered_layout_repair_still_rejects_invalid_final_response(self):
+        with patch.object(service, '_call_gemini_json', return_value={'nuevo_perfil': 'P' * 512}) as llm:
+            with self.assertRaisesRegex(ValueError, '512 caracteres'):
+                service.repair_rendered_cv_layout(draft(), 'Source facts', 'Job', '', [{'field': 'nuevo_perfil'}])
+        self.assertEqual(llm.call_count, 2)
+
     def test_valid_repair_is_accepted_without_truncation_and_cannot_change_company(self):
         original = draft('P' * 767)
         replacement = 'Texto completo ' + 'b' * 583 + '.'

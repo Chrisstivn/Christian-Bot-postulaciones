@@ -1135,6 +1135,24 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
     repaired = CVAdaptation.model_validate({**adaptation.model_dump(), **raw})
     failures = _validate_adaptation(repaired)
     if failures:
+        # Correct only invalid replacements, preserving successful layout edits.
+        invalid_keys = [key for key in keys if _cv_field_problems(repaired, key)]
+        correction_content = (
+            content + "\nRESPUESTA DE REPARACIÓN RECHAZADA:\n"
+            + json.dumps(raw, ensure_ascii=False)
+            + "\nERRORES MEDIDOS (debes cumplir todos):\n"
+            + "\n".join(f"- {failure}" for failure in failures)
+            + "\nDevuelve SOLO estos campos corregidos: " + json.dumps(invalid_keys)
+            + "\nCuenta los caracteres incluidos espacios antes de responder. "
+              "Perfil: apunta a 570 caracteres, nunca menos de 555. "
+              "Reescribe oraciones completas usando solo hechos del maestro."
+        )
+        correction = _call_gemini_json(prompt, correction_content)
+        if not isinstance(correction, dict) or set(correction) != set(invalid_keys):
+            raise ValueError("La corrección del PDF debe devolver solo los campos inválidos")
+        repaired = CVAdaptation.model_validate({**repaired.model_dump(), **correction})
+        failures = _validate_adaptation(repaired)
+    if failures:
         raise ValueError("La reparación del PDF incumplió los guardarraíles: " + "; ".join(failures))
     return repaired
 
