@@ -11,6 +11,24 @@ import excel_output as output
 
 
 class ExcelOutputTests(unittest.TestCase):
+    def test_url_reference_is_resolved_without_replacing_workbook_formula(self):
+        output.ensure_workbook()
+        book=load_workbook(self.path)
+        sheet=book.active
+        sheet['A3']='https://example.com/jobs/3'
+        sheet['C3']='=A3'
+        book.save(self.path);book.close()
+        rows=output.read_rows(lookup_column='real_apply_url',lookup_value='https://example.com/jobs/3')
+        self.assertEqual(rows[0]['real_apply_url'],'https://example.com/jobs/3')
+        book=load_workbook(self.path)
+        self.assertEqual(book.active['C3'].value,'=A3');book.close()
+
+    def test_circular_url_reference_is_not_sent_as_url(self):
+        output.ensure_workbook()
+        book=load_workbook(self.path);sheet=book.active
+        sheet['A2']='=C2';sheet['C2']='=A2'
+        book.save(self.path);book.close()
+        self.assertEqual(output.read_rows()[0]['real_apply_url'],'')
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / "postulaciones.xlsx"

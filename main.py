@@ -107,6 +107,8 @@ def _build_application_pdf_artifacts(payload: ScrapeInput, app_id: str) -> dict:
             "URL vacía: la fila READY debe tener real_apply_url o Link antes de crear el PDF.",
         )
 
+    if not re.match(r'^https?://[^\s/]+(?:/|$)', payload.url.strip(), re.IGNORECASE):
+        raise HTTPException(422, 'La URL debe ser un enlace http/https real, no una fórmula de Excel como =A3.')
     job_text = _resolve_job_text(payload.url.strip(), payload.job_text, "create_application_pdf")
     # PDF-only path: company/title/location are needed, but application
     # questions are not. Keep Gemini reading the full description while avoiding

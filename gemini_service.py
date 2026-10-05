@@ -1218,7 +1218,9 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
         raise ValueError("La reparación del PDF debe devolver solo los campos solicitados")
     repaired = CVAdaptation.model_validate({**adaptation.model_dump(), **raw})
     failures = _validate_adaptation(repaired)
-    if failures:
+    for _ in range(4):
+        if not failures:
+            break
         # Correct only invalid replacements, preserving successful layout edits.
         invalid_keys = [key for key in keys if _cv_field_problems(repaired, key)]
         correction_content = (
@@ -1235,6 +1237,7 @@ defined ni drove. Estos textos deben caber en las fuentes reales del maestro.
         if not isinstance(correction, dict) or set(correction) != set(invalid_keys):
             raise ValueError("La corrección del PDF debe devolver solo los campos inválidos")
         repaired = CVAdaptation.model_validate({**repaired.model_dump(), **correction})
+        raw = repaired.model_dump()
         failures = _validate_adaptation(repaired)
     if failures:
         raise ValueError("La reparación del PDF incumplió los guardarraíles: " + "; ".join(failures))

@@ -2,6 +2,7 @@
 import fcntl
 import os
 import json
+import re
 from typing import Any
 from contextlib import contextmanager
 from pathlib import Path
@@ -81,9 +82,28 @@ def _headers(sheet):
     return [cell.value for cell in sheet[1]]
 
 
+def _url_cell_value(sheet, cell, visited=None):
+    visited = set() if visited is None else visited
+    if cell.coordinate in visited or len(visited) >= 10:
+        return ''
+    visited.add(cell.coordinate)
+    value = cell.value
+    if isinstance(value, str) and value.startswith('='):
+        reference = re.fullmatch(r'=\s*\$?([A-Za-z]{1,3})\$?([1-9][0-9]*)\s*', value)
+        if reference:
+            return _url_cell_value(sheet, sheet[reference[1] + reference[2]], visited)
+        return cell.hyperlink.target if cell.hyperlink else ''
+    return value if value is not None else ''
+
+
 def _row(sheet, number, headers):
-    return {header: (sheet.cell(number, i).value if sheet.cell(number, i).value is not None else "")
-            for i, header in enumerate(headers, 1) if header}
+    row = {}
+    for i, header in enumerate(headers, 1):
+        if header:
+            cell = sheet.cell(number, i)
+            row[header] = (_url_cell_value(sheet, cell) if header in {'Link','real_apply_url'}
+                           else cell.value if cell.value is not None else '')
+    return row
 
 
 class RowInput(BaseModel):

@@ -13,6 +13,20 @@ def draft(profile='P' * 600):
 
 
 class RepairSelectionTests(unittest.TestCase):
+    def test_pdf_profile_repair_retries_783_then_preserves_valid_other_field(self):
+        original=draft()
+        title=original.nuevo_titulo
+        with patch.object(service,'_estimated_title_lines',return_value=2), \
+             patch.object(service,'_estimated_bullet_lines',return_value=2), \
+             patch.object(service,'_call_gemini_json',side_effect=[
+                 {'nuevo_perfil':'P'*783,'nuevo_titulo':title},
+                 {'nuevo_perfil':'P'*783}, {'nuevo_perfil':'P'*570}]) as llm:
+            result=service.repair_rendered_cv_layout(original,'Source','Job','',
+                [{'field':'nuevo_perfil'},{'field':'nuevo_titulo'}])
+        self.assertEqual(llm.call_count,3)
+        self.assertEqual(len(result.nuevo_perfil),570)
+        self.assertEqual(result.nuevo_titulo,title)
+
     def test_only_failed_bullet_retries_and_valid_bullets_are_frozen(self):
         original = draft()
         original.nuevas_tareas[0] = 'Gestiono los plazos o.'
@@ -115,7 +129,7 @@ class RepairSelectionTests(unittest.TestCase):
         with patch.object(service, '_call_gemini_json', return_value={'nuevo_perfil': 'P' * 512}) as llm:
             with self.assertRaisesRegex(ValueError, '512 caracteres'):
                 service.repair_rendered_cv_layout(draft(), 'Source facts', 'Job', '', [{'field': 'nuevo_perfil'}])
-        self.assertEqual(llm.call_count, 2)
+        self.assertEqual(llm.call_count, 5)
 
     def test_valid_repair_is_accepted_without_truncation_and_cannot_change_company(self):
         original = draft('P' * 767)

@@ -18,6 +18,14 @@ from test_christian_cv import ChristianCvTests, SOURCE
 
 @unittest.skipUnless(SOURCE.exists(), 'Local master CV required')
 class PdfPipelineTests(unittest.TestCase):
+    def test_excel_formula_is_rejected_before_gemini_is_called(self):
+        with patch.object(main.gemini_service,'extract_job_info') as llm:
+            with self.assertRaises(HTTPException) as error:
+                main._build_application_pdf_artifacts(ScrapeInput(url='=A3'),'qa')
+        self.assertEqual(error.exception.status_code,422)
+        self.assertIn('fórmula',error.exception.detail)
+        llm.assert_not_called()
+
     def run_pipeline(self, guard_results, repair_error=None, real_render=False):
         with tempfile.TemporaryDirectory() as folder, ExitStack() as stack:
             directory=Path(folder)
